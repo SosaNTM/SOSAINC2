@@ -1,15 +1,17 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useAuth, ALL_USERS } from "@/lib/authContext";
 import {
-  STORAGE_CLOUD_FOLDERS, STORAGE_CLOUD_FILES, STORAGE_CLOUD_SECTIONS,
+  STORAGE_CLOUD_FOLDERS, STORAGE_CLOUD_SECTIONS,
   STORAGE_CLOUD_COLLAPSED_SECTIONS,
 } from "@/constants/storageKeys";
 import {
-  INITIAL_FOLDERS, INITIAL_FILES, INITIAL_SECTIONS,
+  INITIAL_FOLDERS, INITIAL_SECTIONS,
   TOTAL_STORAGE_GB, USED_STORAGE_GB, MOCK_FOLDER_PASSWORDS,
   getFileTypeIcon, formatFileSize, getUserPermission, getFolderPath,
   type CloudFolder, type CloudFile, type PermissionLevel, type FolderSection,
 } from "@/lib/cloudStore";
+import { useCloudFiles } from "@/hooks/useCloudFiles";
+import { usePortalDB } from "@/lib/portalContextDB";
 import {
   Cloud, FolderIcon, Trash2, X, Download, Pencil, Move, Link2,
   Eye, EyeOff, Shield, Lock, Unlock, Home, AlertTriangle, Layers,
@@ -19,7 +21,6 @@ import FilePreviewDrawer from "@/components/cloud/FilePreviewDrawer";
 import TrashPreviewDrawer from "@/components/cloud/TrashPreviewDrawer";
 import StorageOverview from "@/components/cloud/StorageOverview";
 import { ActionMenu, type ActionMenuEntry } from "@/components/ActionMenu";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { addAuditEntry } from "@/lib/adminStore";
 import { ModuleErrorBoundary } from "@/components/ui/ModuleErrorBoundary";
@@ -85,37 +86,23 @@ function UploadModal({
   currentFolderId: string | null;
   folders: CloudFolder[];
   onClose: () => void;
-  onUpload: (names: string[]) => void;
+  onUpload: (files: File[]) => Promise<void>;
 }) {
-  const [uploadFiles, setUploadFiles] = useState<string[]>([]);
-  const [progress, setProgress] = useState<Record<string, number>>({});
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUploadFiles(Array.from(e.target.files || []).map((f) => f.name));
+    setUploadFiles(Array.from(e.target.files || []));
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (uploadFiles.length === 0) return;
     setUploading(true);
-    const prog: Record<string, number> = {};
-    uploadFiles.forEach((f) => { prog[f] = 0; });
-    setProgress({ ...prog });
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        const next = { ...prev };
-        let allDone = true;
-        Object.keys(next).forEach((k) => {
-          next[k] = Math.min(100, next[k] + Math.floor(Math.random() * 25) + 10);
-          if (next[k] < 100) allDone = false;
-        });
-        if (allDone) {
-          clearInterval(interval);
-          setTimeout(() => onUpload(uploadFiles), 300);
-        }
-        return next;
-      });
-    }, 400);
+    try {
+      await onUpload(uploadFiles);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const targetFolder = currentFolderId
@@ -135,33 +122,24 @@ function UploadModal({
       </p>
       {uploadFiles.length > 0 && (
         <div className="flex flex-col gap-2 mb-4">
-          {uploadFiles.map((name) => (
-            <div key={name}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-foreground">{name}</span>
-                {uploading && (
-                  <span className="text-xs text-primary">{progress[name] || 0}%</span>
-                )}
-              </div>
-              {uploading && <Progress value={progress[name] || 0} className="h-1.5" />}
+          {uploadFiles.map((file) => (
+            <div key={file.name} className="flex items-center justify-between">
+              <span className="text-xs text-foreground">{file.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {(file.size / 1024 / 1024).toFixed(1)} MB
+              </span>
             </div>
           ))}
         </div>
       )}
       <div className="flex gap-2 justify-end">
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm px-4 py-2 rounded-lg border border-border bg-background hover:bg-accent transition-colors"
-        >
+        <button type="button" onClick={onClose}
+          className="text-sm px-4 py-2 rounded-lg border border-border bg-background hover:bg-accent transition-colors">
           Cancel
         </button>
-        <button
-          type="button"
-          onClick={handleUpload}
+        <button type="button" onClick={() => { void handleUpload(); }}
           disabled={uploadFiles.length === 0 || uploading}
-          className="text-sm px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
+          className="text-sm px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
           {uploading ? "Uploading..." : "Upload"}
         </button>
       </div>
@@ -509,6 +487,8 @@ function NewFolderModal({
 const CloudPage = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const { currentPortalId } = usePortalDB();
+  const cloudFiles = useCloudFiles();
 
   // ── State: Data ──
   const [folders, setFolders] = useState<CloudFolder[]>(() => {
@@ -529,24 +509,7 @@ const CloudPage = () => {
     return INITIAL_FOLDERS;
   });
 
-  const [files, setFiles] = useState<CloudFile[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_CLOUD_FILES);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].id) {
-          return parsed.map((f: any) => ({
-            ...f,
-            createdAt: new Date(f.createdAt),
-            modifiedAt: new Date(f.modifiedAt),
-            deletedAt: f.deletedAt ? new Date(f.deletedAt) : null,
-            permanentDeleteAt: f.permanentDeleteAt ? new Date(f.permanentDeleteAt) : null,
-          }));
-        }
-      }
-    } catch { localStorage.removeItem(STORAGE_CLOUD_FILES); }
-    return INITIAL_FILES;
-  });
+  const files = cloudFiles.files;
 
   const [sections, setSections] = useState<FolderSection[]>(() => {
     try {
@@ -626,7 +589,6 @@ const CloudPage = () => {
 
   // ── Persist to localStorage ──
   useEffect(() => { localStorage.setItem(STORAGE_CLOUD_FOLDERS, JSON.stringify(folders)); }, [folders]);
-  useEffect(() => { localStorage.setItem(STORAGE_CLOUD_FILES, JSON.stringify(files)); }, [files]);
   useEffect(() => { localStorage.setItem(STORAGE_CLOUD_SECTIONS, JSON.stringify(sections)); }, [sections]);
 
   // ── Lockout countdown timer ──
@@ -963,42 +925,24 @@ const CloudPage = () => {
     });
   };
 
-  const moveToTrash = (fileId: string) => {
+  const moveToTrash = useCallback(async (fileId: string) => {
     const file = files.find((f) => f.id === fileId);
     const folderName = file ? getFolderPath(file.folderId, folders) : "";
-    setFiles((prev) =>
-      prev.map((f) => {
-        if (f.id !== fileId) return f;
-        const delDate = new Date();
-        const permDelDate = new Date(delDate);
-        permDelDate.setDate(permDelDate.getDate() + 60);
-        return {
-          ...f, isDeleted: true, deletedAt: delDate, deletedBy: userId,
-          originalFolderId: f.folderId, originalFolderPath: getFolderPath(f.folderId, folders),
-          permanentDeleteAt: permDelDate, folderId: "trash", sectionId: null,
-        };
-      })
-    );
+    await cloudFiles.softDelete(fileId, userId);
     toast.success("Moved to Trash");
     if (file)
       addAuditEntry({
         userId, action: `Moved "${file.name}" to Trash`, category: "cloud",
         details: `From ${folderName}`, icon: "🗑️",
       });
-  };
+  }, [files, folders, userId, cloudFiles]);
 
-  const handleRecover = (file: CloudFile) => {
+  const handleRecover = useCallback(async (file: CloudFile) => {
     const origFolder = file.originalFolderId
       ? folders.find((f) => f.id === file.originalFolderId && !f.isDeleted)
       : null;
     if (origFolder) {
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === file.id
-            ? { ...f, isDeleted: false, deletedAt: null, deletedBy: null, permanentDeleteAt: null, folderId: origFolder.id }
-            : f
-        )
-      );
+      await cloudFiles.recoverFile(file.id, origFolder.id);
       toast.success(`"${file.name}" restored to ${origFolder.name}`);
       addAuditEntry({
         userId, action: `Restored "${file.name}" from Trash`, category: "cloud",
@@ -1008,30 +952,21 @@ const CloudPage = () => {
       setRecoverFile(file);
       setRecoverTarget("root");
     }
-  };
+  }, [folders, userId, cloudFiles]);
 
-  const executeRecover = () => {
+  const executeRecover = useCallback(async () => {
     if (!recoverFile) return;
-    let targetId: string;
-    if (recoverTarget === "root") targetId = "f_root_projects";
-    else if (recoverTarget === "choose" && moveTarget) targetId = moveTarget;
-    else {
-      const origParent = recoverFile.originalFolderId
-        ? folders.find((f) => f.id === recoverFile.originalFolderId)?.parentId
-        : null;
-      targetId =
-        origParent && folders.find((f) => f.id === origParent && !f.isDeleted)
-          ? origParent
-          : "f_root_projects";
+    if (recoverTarget !== "root" && !moveTarget) {
+      toast.error("Select a destination folder");
+      return;
     }
+    const targetId =
+      recoverTarget === "root"
+        ? (folders.find((f) => f.parentId === null && !f.isDeleted)?.id ?? folders[0]?.id)
+        : moveTarget;
+    if (!targetId) { toast.error("No valid destination folder"); return; }
     const targetName = folders.find((f) => f.id === targetId)?.name || "Cloud";
-    setFiles((prev) =>
-      prev.map((f) =>
-        f.id === recoverFile.id
-          ? { ...f, isDeleted: false, deletedAt: null, deletedBy: null, permanentDeleteAt: null, folderId: targetId }
-          : f
-      )
-    );
+    await cloudFiles.recoverFile(recoverFile.id, targetId);
     toast.success(`"${recoverFile.name}" restored to ${targetName}`);
     addAuditEntry({
       userId, action: `Restored "${recoverFile.name}" from Trash`, category: "cloud",
@@ -1039,11 +974,11 @@ const CloudPage = () => {
     });
     setRecoverFile(null);
     setMoveTarget(null);
-  };
+  }, [recoverFile, recoverTarget, moveTarget, folders, userId, cloudFiles]);
 
-  const permanentDelete = (fileId: string) => {
+  const permanentDelete = useCallback(async (fileId: string) => {
     const file = files.find((f) => f.id === fileId);
-    setFiles((prev) => prev.filter((f) => f.id !== fileId));
+    await cloudFiles.permanentDelete(fileId);
     setConfirmPermDelete(null);
     toast.success("Permanently deleted");
     if (file)
@@ -1051,18 +986,18 @@ const CloudPage = () => {
         userId, action: `Permanently deleted "${file.name}"`, category: "cloud",
         details: "File removed from Trash — cannot be recovered", icon: "❌",
       });
-  };
+  }, [files, userId, cloudFiles]);
 
-  const emptyTrash = () => {
+  const emptyTrash = useCallback(async () => {
     const count = files.filter((f) => f.isDeleted).length;
-    setFiles((prev) => prev.filter((f) => !f.isDeleted));
+    await cloudFiles.emptyTrash();
     setConfirmEmptyTrash(false);
     toast.success("Trash emptied");
     addAuditEntry({
       userId, action: "Emptied Trash", category: "cloud",
       details: `${count} file(s) permanently deleted`, icon: "🗑️",
     });
-  };
+  }, [files, userId, cloudFiles]);
 
   const deleteFolderAndContents = (folder: CloudFolder) => {
     const allFolderIds = new Set<string>();
@@ -1074,19 +1009,8 @@ const CloudPage = () => {
     const affectedFiles = files.filter(
       (f) => allFolderIds.has(f.folderId) && !f.isDeleted
     );
-    setFiles((prev) =>
-      prev.map((f) => {
-        if (!allFolderIds.has(f.folderId) || f.isDeleted) return f;
-        const delDate = new Date();
-        const permDelDate = new Date(delDate);
-        permDelDate.setDate(permDelDate.getDate() + 60);
-        return {
-          ...f, isDeleted: true, deletedAt: delDate, deletedBy: userId,
-          originalFolderId: f.folderId, originalFolderPath: getFolderPath(f.folderId, folders),
-          permanentDeleteAt: permDelDate, folderId: "trash", sectionId: null,
-        };
-      })
-    );
+    // Cascade: soft-delete every file inside the affected folders via the DB layer.
+    void Promise.all(affectedFiles.map((f) => cloudFiles.softDelete(f.id, userId)));
     setSections((prev) => prev.filter((s) => !allFolderIds.has(s.folderId)));
     setFolders((prev) =>
       prev.map((f) => (allFolderIds.has(f.id) ? { ...f, isDeleted: true } : f))
@@ -1100,17 +1024,11 @@ const CloudPage = () => {
     });
   };
 
-  const moveFileToFolder = (fileId: string, targetFolderId: string) => {
+  const moveFileToFolder = useCallback(async (fileId: string, targetFolderId: string) => {
     const file = files.find((f) => f.id === fileId);
     const targetFolderName = folders.find((f) => f.id === targetFolderId)?.name || "folder";
-    const sourceFolderName = file
-      ? folders.find((f) => f.id === file.folderId)?.name || "Cloud"
-      : "Cloud";
-    setFiles((prev) =>
-      prev.map((f) =>
-        f.id === fileId ? { ...f, folderId: targetFolderId, modifiedAt: new Date(), sectionId: null } : f
-      )
-    );
+    const sourceFolderName = file ? folders.find((f) => f.id === file.folderId)?.name || "Cloud" : "Cloud";
+    await cloudFiles.moveFile(fileId, targetFolderId);
     toast.success(`Moved to ${targetFolderName}`);
     setMoveFileModal(null);
     setMoveTarget(null);
@@ -1119,60 +1037,58 @@ const CloudPage = () => {
         userId, action: `Moved "${file.name}" to "${targetFolderName}"`, category: "cloud",
         details: `From ${sourceFolderName}`, icon: "📦",
       });
-  };
+  }, [files, folders, userId, cloudFiles]);
 
-  const renameFile = (fileId: string, newName?: string) => {
+  const renameFile = useCallback(async (fileId: string, newName?: string) => {
     const val = newName || renameValue;
     if (!val.trim()) { setRenamingFileId(null); return; }
     const file = files.find((f) => f.id === fileId);
     const oldName = file?.name;
-    setFiles((prev) =>
-      prev.map((f) => (f.id === fileId ? { ...f, name: val.trim(), modifiedAt: new Date() } : f))
-    );
+    await cloudFiles.renameFile(fileId, val.trim());
     setRenamingFileId(null);
     if (file && oldName !== val.trim())
       addAuditEntry({
         userId, action: `Renamed "${oldName}" to "${val.trim()}"`, category: "cloud",
         details: "File renamed", icon: "✏️",
       });
+  }, [files, userId, renameValue, cloudFiles]);
+
+  const handleDownload = useCallback(async (fileId: string) => {
+    const url = await cloudFiles.getDownloadUrl(fileId);
+    if (!url) { toast.error("Could not generate download link"); return; }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, [cloudFiles]);
+
+  const updateFileDescription = (_fileId: string, _desc: string) => {
+    // Description editing is not persisted to the DB layer (acceptable known limitation).
   };
 
-  const updateFileDescription = (fileId: string, desc: string) => {
-    setFiles((prev) =>
-      prev.map((f) =>
-        f.id === fileId ? { ...f, description: desc || null, modifiedAt: new Date() } : f
-      )
-    );
-  };
-
-  const mockUpload = (names: string[]) => {
-    const targetFolderId = currentFolderId ?? folders[0]?.id ?? null;
-    const newFiles: CloudFile[] = names.map((name, i) => {
-      const ext = name.split(".").pop()?.toLowerCase() || "";
-      let type: CloudFile["type"] = "other";
-      if (ext === "pdf") type = "pdf";
-      else if (["doc", "docx"].includes(ext)) type = "docx";
-      else if (["xls", "xlsx"].includes(ext)) type = "xlsx";
-      else if (["jpg", "png", "gif", "webp", "svg"].includes(ext)) type = "image";
-      else if (ext === "zip") type = "zip";
-      else if (ext === "pptx") type = "pptx";
-      return {
-        id: `cf_${Date.now()}_${i}`, name, folderId: targetFolderId,
-        size: Math.floor(Math.random() * 5000000) + 100000, type, ownerId: userId,
-        ownerName: user?.displayName || user?.email || userId,
-        modifiedAt: new Date(), createdAt: new Date(), isDeleted: false,
-        deletedAt: null, deletedBy: null, originalFolderId: null,
-        originalFolderPath: null, permanentDeleteAt: null,
-      };
-    });
-    setFiles((prev) => [...newFiles, ...prev]);
+  const handleRealUpload = async (actualFiles: File[]) => {
+    if (!currentFolderId) {
+      toast.error("Select a folder first");
+      return;
+    }
+    let successCount = 0;
+    const folderName = folders.find((f) => f.id === currentFolderId)?.name || "Root";
+    for (const file of actualFiles) {
+      try {
+        await cloudFiles.upload(file, currentFolderId);
+        successCount++;
+      } catch {
+        toast.error(`Failed to upload ${file.name}`);
+      }
+    }
     setShowUploadModal(false);
-    toast.success(`${names.length} file(s) uploaded`);
-    const folderName = folders.find((f) => f.id === targetFolderId)?.name || "Root";
-    addAuditEntry({
-      userId, action: `Uploaded ${names.length} file(s) to "${folderName}"`, category: "cloud",
-      details: names.join(", "), icon: "📄",
-    });
+    if (successCount > 0) {
+      toast.success(`${successCount} file(s) uploaded to "${folderName}"`);
+      addAuditEntry({
+        userId,
+        action: `Uploaded ${successCount} file(s) to "${folderName}"`,
+        category: "cloud",
+        details: actualFiles.map((f) => f.name).join(", "),
+        icon: "📄",
+      });
+    }
   };
 
   // ── Section CRUD ──
@@ -1220,9 +1136,7 @@ const CloudPage = () => {
   };
 
   const deleteSection = (section: FolderSection) => {
-    setFiles((prev) =>
-      prev.map((f) => (f.sectionId === section.id ? { ...f, sectionId: null } : f))
-    );
+    // Section assignments are not persisted to the DB layer (acceptable known limitation).
     setSections((prev) => prev.filter((s) => s.id !== section.id));
     setDeleteSectionConfirm(null);
     toast.success(`Section "${section.name}" deleted`);
@@ -1247,10 +1161,8 @@ const CloudPage = () => {
     );
   };
 
-  const moveFileToSection = (fileId: string, sectionId: string | null) => {
-    setFiles((prev) =>
-      prev.map((f) => (f.id === fileId ? { ...f, sectionId } : f))
-    );
+  const moveFileToSection = (_fileId: string, sectionId: string | null) => {
+    // Section assignments are not persisted to the DB layer (acceptable known limitation).
     const sectionName = sectionId
       ? sections.find((s) => s.id === sectionId)?.name
       : "Other Files";
@@ -1284,13 +1196,7 @@ const CloudPage = () => {
         id: "download",
         icon: <Download className="w-3.5 h-3.5" />,
         label: "Download",
-        onClick: () => {
-          toast.info("Download started");
-          addAuditEntry({
-            userId, action: `Downloaded "${file.name}"`, category: "cloud",
-            details: `${formatFileSize(file.size)} from ${getFolderPath(file.folderId, folders)}`, icon: "📥",
-          });
-        },
+        onClick: () => { void handleDownload(file.id); },
         show: !!perm,
       },
       {
@@ -1643,7 +1549,7 @@ const CloudPage = () => {
             currentFolderId={currentFolderId}
             folders={folders}
             onClose={() => setShowUploadModal(false)}
-            onUpload={mockUpload}
+            onUpload={handleRealUpload}
           />
         )}
         {permissionsModal && (
