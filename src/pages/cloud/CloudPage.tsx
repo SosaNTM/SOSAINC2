@@ -928,7 +928,7 @@ const CloudPage = () => {
   const moveToTrash = useCallback(async (fileId: string) => {
     const file = files.find((f) => f.id === fileId);
     const folderName = file ? getFolderPath(file.folderId, folders) : "";
-    await cloudFiles.softDelete(fileId, userId);
+    await cloudFiles.softDelete(fileId);
     toast.success("Moved to Trash");
     if (file)
       addAuditEntry({
@@ -1010,7 +1010,7 @@ const CloudPage = () => {
       (f) => allFolderIds.has(f.folderId) && !f.isDeleted
     );
     // Cascade: soft-delete every file inside the affected folders via the DB layer.
-    void Promise.all(affectedFiles.map((f) => cloudFiles.softDelete(f.id, userId)));
+    void Promise.all(affectedFiles.map((f) => cloudFiles.softDelete(f.id)));
     setSections((prev) => prev.filter((s) => !allFolderIds.has(s.folderId)));
     setFolders((prev) =>
       prev.map((f) => (allFolderIds.has(f.id) ? { ...f, isDeleted: true } : f))
@@ -1074,8 +1074,8 @@ const CloudPage = () => {
       try {
         await cloudFiles.upload(file, currentFolderId);
         successCount++;
-      } catch {
-        toast.error(`Failed to upload ${file.name}`);
+      } catch (err) {
+        toast.error(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : "Unknown error"}`);
       }
     }
     setShowUploadModal(false);
@@ -1350,6 +1350,25 @@ const CloudPage = () => {
 
         <div style={{ height: 1, background: "var(--sosa-border)", margin: "6px 14px" }} />
         {rootFolders.map((f) => renderFolderItem(f, 0))}
+        {isOwnerOrAdmin && (
+          <button
+            type="button"
+            onClick={() => setShowNewFolderModal(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, width: "100%",
+              padding: "7px 14px", cursor: "pointer",
+              fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 400,
+              letterSpacing: "0.06em", textTransform: "uppercase",
+              color: "var(--portal-accent)", background: "transparent",
+              border: "none", borderRadius: 0, opacity: 0.7,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = "var(--sosa-bg-2)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.background = "transparent"; }}
+          >
+            <span style={{ fontSize: 14, lineHeight: 1 }}>+</span>
+            <span>Nuova cartella</span>
+          </button>
+        )}
       </div>
 
       {/* Trash — pinned above storage */}

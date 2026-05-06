@@ -55,7 +55,18 @@ function toCloudFile(row: CloudFileRow): CloudFile {
 
 async function callPresign(body: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { data, error } = await supabase.functions.invoke("cloud-presign", { body });
-  if (error) throw new Error(error.message);
+  if (error) {
+    const ctx = (error as { context?: Response }).context;
+    if (ctx) {
+      try {
+        const errBody = await ctx.clone().json();
+        throw new Error(errBody?.error ?? error.message);
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message !== error.message) throw parseErr;
+      }
+    }
+    throw new Error(error.message);
+  }
   return data as Record<string, unknown>;
 }
 
@@ -122,8 +133,9 @@ export function useCloudFiles() {
         uploaded_by: user.id,
       });
       if (error) throw new Error(error.message);
+      await fetchAll();
     },
-    [currentPortalId]
+    [currentPortalId, fetchAll]
   );
 
   const getDownloadUrl = useCallback(
@@ -144,11 +156,13 @@ export function useCloudFiles() {
   );
 
   const softDelete = useCallback(
-    async (fileId: string, deletedBy: string): Promise<void> => {
+    async (fileId: string): Promise<void> => {
       if (!currentPortalId) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       await supabase
         .from("cloud_files")
-        .update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: deletedBy })
+        .update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: user.id })
         .eq("id", fileId)
         .eq("portal_id", currentPortalId);
       await fetchAll();

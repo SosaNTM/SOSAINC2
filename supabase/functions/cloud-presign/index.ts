@@ -10,7 +10,7 @@ import {
 } from "npm:@aws-sdk/client-s3";
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { verifyJWT, checkRateLimit } from "../_shared/rateLimit.ts";
+import { checkRateLimit } from "../_shared/rateLimit.ts";
 
 const ALLOWED_ORIGINS = [
   Deno.env.get("FRONTEND_URL") || "http://localhost:8080",
@@ -53,21 +53,30 @@ serve(async (req: Request) => {
   const rl = checkRateLimit(req);
   if (rl) return rl;
 
-  const auth = await verifyJWT(req);
-  if (auth instanceof Response) return auth;
-  const userId = (auth as { sub: string }).sub;
-
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
       status,
       headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
 
+  const authHeader = req.headers.get("authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "Missing authorization" }, 401);
+
   try {
     const { operation, portal_id, file_id, file_name, mime_type } =
       await req.json();
 
     if (!operation || !portal_id) return json({ error: "Missing operation or portal_id" }, 400);
+
+    // Verify caller via Supabase Auth (no JWT secret needed)
+    const supabaseAnon = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
+    if (userError || !user) return json({ error: "Unauthorized" }, 401);
+    const userId = user.id;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
