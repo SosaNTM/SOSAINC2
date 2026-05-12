@@ -95,38 +95,11 @@ function SectionHeader({
   const isOther = !section;
   const menuItems: ActionMenuEntry[] = section
     ? [
-        {
-          id: "rename",
-          icon: <Pencil className="w-3.5 h-3.5" />,
-          label: "Rename",
-          onClick: onRename || (() => {}),
-        },
-        {
-          id: "add-below",
-          icon: <Plus className="w-3.5 h-3.5" />,
-          label: "Add Section Below",
-          onClick: onAddBelow || (() => {}),
-        },
-        {
-          id: "move-up",
-          icon: <ChevronRight className="w-3.5 h-3.5 -rotate-90" />,
-          label: "Move Up",
-          onClick: onMoveUp || (() => {}),
-        },
-        {
-          id: "move-down",
-          icon: <ChevronRight className="w-3.5 h-3.5 rotate-90" />,
-          label: "Move Down",
-          onClick: onMoveDown || (() => {}),
-        },
-        { type: "divider" },
-        {
-          id: "delete",
-          icon: <Trash2 className="w-3.5 h-3.5" />,
-          label: "Delete Section",
-          onClick: onDelete || (() => {}),
-          destructive: true,
-        },
+        ...(onRename ? [{ id: "rename", icon: <Pencil className="w-3.5 h-3.5" />, label: "Rename", onClick: onRename }] : []),
+        ...(onAddBelow ? [{ id: "add-below", icon: <Plus className="w-3.5 h-3.5" />, label: "Add Section Below", onClick: onAddBelow }] : []),
+        ...(onMoveUp ? [{ id: "move-up", icon: <ChevronRight className="w-3.5 h-3.5 -rotate-90" />, label: "Move Up", onClick: onMoveUp }] : []),
+        ...(onMoveDown ? [{ id: "move-down", icon: <ChevronRight className="w-3.5 h-3.5 rotate-90" />, label: "Move Down", onClick: onMoveDown }] : []),
+        ...(onDelete ? [{ type: "divider" as const }, { id: "delete", icon: <Trash2 className="w-3.5 h-3.5" />, label: "Delete Section", onClick: onDelete, destructive: true }] : []),
       ]
     : [];
 

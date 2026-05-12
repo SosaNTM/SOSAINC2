@@ -1,11 +1,11 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { X } from "lucide-react";
+import { toast } from "sonner";
 import { usePortalDB } from "@/lib/portalContextDB";
+import { supabase } from "@/lib/supabase";
+import { broadcastLeadgenUpdate } from "@/lib/leadgenRealtime";
 import { useLeadgenAllLeads, PAGE_SIZE, type AllLeadsFilters } from "@/hooks/leadgen/useLeadgenAllLeads";
 import { useLeadgenMembers } from "@/hooks/leadgen/useLeadgenMembers";
-import type { LeadgenLead } from "@/types/leadgen";
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function parseFilters(p: URLSearchParams): AllLeadsFilters {
@@ -45,68 +45,6 @@ const STATUS_COLORS: Record<string, string> = {
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-// ── Lead preview modal ────────────────────────────────────────────────────────
-
-function LeadPreviewModal({
-  lead, memberName, onClose, onOpenDetail,
-}: { lead: LeadgenLead; memberName: string; onClose: () => void; onOpenDetail: () => void }) {
-  const rows: [string, React.ReactNode][] = [
-    ["Categoria",   lead.category ?? "—"],
-    ["Città",       lead.city ?? "—"],
-    ["Telefono",    lead.phone ?? "—"],
-    ["Email",       lead.emails.length > 0 ? lead.emails.join(", ") : "—"],
-    ["Sito",        lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-primary)", textDecoration: "none" }}>→ {lead.website}</a> : "—"],
-    ["Stato",       <span style={{ color: STATUS_COLORS[lead.outreach_status] ?? "var(--text-tertiary)", fontWeight: 700, textTransform: "uppercase", fontSize: 10 }}>{STATUS_LABELS[lead.outreach_status]}</span>],
-    ["Assegnato a", memberName],
-    ["Rating",      lead.rating != null ? `${lead.rating.toFixed(1)} ★` : "—"],
-    ["Recensioni",  lead.reviews_count != null ? lead.reviews_count.toLocaleString("it-IT") : "—"],
-    ["Aggiunto il", fmtDate(lead.created_at)],
-  ];
-
-  return (
-    <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ background: "var(--sosa-bg)", border: "1.5px solid var(--glass-border)", width: "100%", maxWidth: 520, padding: 28, position: "relative" }}
-      >
-        <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 4 }}>
-          <X size={16} />
-        </button>
-
-        <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--text-tertiary)", margin: "0 0 6px" }}>
-          Lead Generation
-        </p>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 20px", paddingRight: 24 }}>
-          {lead.name}
-        </h2>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 0, marginBottom: 24, border: "0.5px solid var(--glass-border)" }}>
-          {rows.map(([label, value]) => (
-            <div key={label} style={{ display: "grid", gridTemplateColumns: "130px 1fr", gap: 12, padding: "9px 14px", borderBottom: "1px solid var(--glass-border)" }}>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)", alignSelf: "center" }}>
-                {label}
-              </span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)" }}>
-                {value}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} className="btn-glass-ds">Chiudi</button>
-          <button onClick={onOpenDetail} className="btn-primary">
-            Apri dettaglio ↗
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── Filter sub-components ─────────────────────────────────────────────────────
@@ -175,13 +113,18 @@ function StaticTh({ label }: { label: string }) {
 
 export default function LeadgenAllLeads() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { currentPortal } = usePortalDB();
+  const { currentPortal, currentPortalId } = usePortalDB();
   const navigate = useNavigate();
 
-  const [selectedLead, setSelectedLead] = useState<LeadgenLead | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [takingLeadId, setTakingLeadId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id ?? null));
+  }, []);
 
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
-  const { leads, total, categories, loading } = useLeadgenAllLeads(filters);
+  const { leads, total, categories, loading, refetch } = useLeadgenAllLeads(filters);
   const { members } = useLeadgenMembers();
 
   const memberMap = useMemo(
@@ -213,6 +156,24 @@ export default function LeadgenAllLeads() {
       return next;
     }, { replace: true });
   }, [setSearchParams]);
+
+  const handleTakeLead = useCallback(async (leadId: string) => {
+    if (!currentUserId || !currentPortalId) return;
+    setTakingLeadId(leadId);
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("leadgen_leads").update({
+      assigned_to: currentUserId,
+      assigned_at: now,
+      assigned_by: currentUserId,
+      last_activity_at: now,
+      updated_at: now,
+    }).eq("id", leadId).eq("portal_id", currentPortalId);
+    setTakingLeadId(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Lead preso in carico");
+    broadcastLeadgenUpdate("lead_updated", { leadId });
+    refetch();
+  }, [currentUserId, currentPortalId, refetch]);
 
   const hasActive = [...searchParams.keys()].some((k) => k !== "page");
   const sortProps = (col: AllLeadsFilters["sortBy"]) => ({ col, active: filters.sortBy === col, dir: filters.sortDir, onSort: () => setSort(col) });
@@ -304,19 +265,20 @@ export default function LeadgenAllLeads() {
               <SortTh label="Stato"       {...sortProps("outreach_status")} />
               <StaticTh label="Assegnato a" />
               <SortTh label="Aggiunto il" {...sortProps("created_at")} />
+              <th style={{ borderBottom: "1px solid var(--glass-border)", width: 40 }} />
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={10} style={{ padding: 40, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-tertiary)" }}>Caricamento...</td></tr>
+              <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-tertiary)" }}>Caricamento...</td></tr>
             )}
             {!loading && leads.length === 0 && (
-              <tr><td colSpan={10} style={{ padding: 40, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-tertiary)" }}>Nessun lead trovato con i filtri selezionati.</td></tr>
+              <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-tertiary)" }}>Nessun lead trovato con i filtri selezionati.</td></tr>
             )}
             {!loading && leads.map((lead) => (
               <tr
                 key={lead.id}
-                onClick={() => setSelectedLead(lead)}
+                onClick={() => navigate(`${prefix}/leadgen/lead/${lead.id}`)}
                 style={{ borderBottom: "1px solid var(--glass-border)", cursor: "pointer" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -345,6 +307,26 @@ export default function LeadgenAllLeads() {
                 </td>
                 <td style={{ padding: "9px 12px" }}><Mono>{lead.assigned_to ? (memberMap.get(lead.assigned_to) ?? "—") : "—"}</Mono></td>
                 <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}><Mono dim>{fmtDate(lead.created_at)}</Mono></td>
+                <td style={{ padding: "4px 8px", width: 40 }} onClick={(e) => e.stopPropagation()}>
+                  {currentUserId && !lead.assigned_to && (
+                    <button
+                      onClick={() => handleTakeLead(lead.id)}
+                      disabled={takingLeadId === lead.id}
+                      title="Prendi in carico"
+                      style={{
+                        background: "var(--accent-primary)", border: "none", color: "#000",
+                        fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700,
+                        padding: "4px 8px", cursor: takingLeadId === lead.id ? "not-allowed" : "pointer",
+                        opacity: takingLeadId === lead.id ? 0.5 : 1, whiteSpace: "nowrap",
+                      }}
+                    >
+                      {takingLeadId === lead.id ? "⏳" : "🤙"}
+                    </button>
+                  )}
+                  {lead.assigned_to === currentUserId && (
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--color-success)", fontWeight: 700 }}>✓</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -364,18 +346,6 @@ export default function LeadgenAllLeads() {
         </div>
       )}
 
-      {/* Lead preview modal */}
-      {selectedLead && (
-        <LeadPreviewModal
-          lead={selectedLead}
-          memberName={selectedLead.assigned_to ? (memberMap.get(selectedLead.assigned_to) ?? "—") : "—"}
-          onClose={() => setSelectedLead(null)}
-          onOpenDetail={() => {
-            navigate(`${prefix}/leadgen/lead/${selectedLead.id}`);
-            setSelectedLead(null);
-          }}
-        />
-      )}
     </div>
   );
 }

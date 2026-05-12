@@ -110,12 +110,18 @@ serve(async (req: Request) => {
       if (!file_id) return json({ error: "Missing file_id" }, 400);
       const { data: fileRow } = await supabase
         .from("cloud_files")
-        .select("s3_key")
+        .select("s3_key, name")
         .eq("id", file_id)
         .eq("portal_id", portal_id)
         .maybeSingle();
       if (!fileRow) return json({ error: "File not found" }, 404);
-      const command = new GetObjectCommand({ Bucket: BUCKET, Key: (fileRow as { s3_key: string }).s3_key });
+      const row = fileRow as { s3_key: string; name: string };
+      const safeFilename = encodeURIComponent(row.name).replace(/['"]/g, "");
+      const command = new GetObjectCommand({
+        Bucket: BUCKET,
+        Key: row.s3_key,
+        ResponseContentDisposition: `attachment; filename="${safeFilename}"`,
+      });
       const url = await getSignedUrl(s3, command, { expiresIn: PRESIGN_TTL_SECONDS });
       return json({ url });
     }

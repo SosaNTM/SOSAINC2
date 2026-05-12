@@ -86,28 +86,27 @@ function UploadModal({
   currentFolderId: string | null;
   folders: CloudFolder[];
   onClose: () => void;
-  onUpload: (files: File[]) => Promise<void>;
+  onUpload: (files: File[], folderId: string) => Promise<void>;
 }) {
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>(currentFolderId ?? "");
+
+  const availableFolders = folders.filter((f) => !f.isDeleted);
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadFiles(Array.from(e.target.files || []));
   };
 
   const handleUpload = async () => {
-    if (uploadFiles.length === 0) return;
+    if (uploadFiles.length === 0 || !selectedFolderId) return;
     setUploading(true);
     try {
-      await onUpload(uploadFiles);
+      await onUpload(uploadFiles, selectedFolderId);
     } finally {
       setUploading(false);
     }
   };
-
-  const targetFolder = currentFolderId
-    ? folders.find((f) => f.id === currentFolderId)?.name
-    : "Root";
 
   return (
     <ModalOverlay onClose={onClose}>
@@ -117,9 +116,6 @@ function UploadModal({
         <span className="text-sm text-muted-foreground">Drop files here or click to browse</span>
         <input type="file" multiple className="hidden" onChange={handleFiles} />
       </label>
-      <p className="text-xs text-muted-foreground mb-3">
-        Destination: <strong className="text-foreground">{targetFolder}</strong>
-      </p>
       {uploadFiles.length > 0 && (
         <div className="flex flex-col gap-2 mb-4">
           {uploadFiles.map((file) => (
@@ -132,13 +128,30 @@ function UploadModal({
           ))}
         </div>
       )}
+      <div className="mb-4">
+        <label className="block text-xs text-muted-foreground mb-1">Destination folder</label>
+        {availableFolders.length === 0 ? (
+          <p className="text-xs text-destructive">No folders yet — create a folder first.</p>
+        ) : (
+          <select
+            value={selectedFolderId}
+            onChange={(e) => setSelectedFolderId(e.target.value)}
+            className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="">— select a folder —</option>
+            {availableFolders.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
       <div className="flex gap-2 justify-end">
         <button type="button" onClick={onClose}
           className="text-sm px-4 py-2 rounded-lg border border-border bg-background hover:bg-accent transition-colors">
           Cancel
         </button>
         <button type="button" onClick={() => { void handleUpload(); }}
-          disabled={uploadFiles.length === 0 || uploading}
+          disabled={uploadFiles.length === 0 || !selectedFolderId || uploading}
           className="text-sm px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
           {uploading ? "Uploading..." : "Upload"}
         </button>
@@ -327,21 +340,29 @@ function NewFolderModal({
     toast.success(`Folder "${name.trim()}" created`);
   };
 
+  const mono = { fontFamily: "var(--font-mono)" } as const;
+  const labelStyle: React.CSSProperties = { ...mono, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.10em", color: "var(--text-tertiary)", display: "block", marginBottom: 6 };
+  const inputStyle: React.CSSProperties = { ...mono, fontSize: 12, width: "100%", padding: "8px 10px", background: "var(--glass-bg)", border: "1px solid var(--glass-border)", color: "var(--text-primary)", outline: "none" };
+
   const renderPickerItem = (folder: CloudFolder, depth: number): React.ReactNode => {
     const children = getChildren(folder.id);
+    const active = location === folder.id;
     return (
       <div key={folder.id}>
         <button
           type="button"
           onClick={() => setLocation(folder.id)}
-          className={`flex items-center gap-2 w-full text-left text-sm rounded-md px-2 py-1.5 transition-colors ${
-            location === folder.id
-              ? "bg-primary/15 text-primary font-medium"
-              : "text-foreground hover:bg-accent/50"
-          }`}
-          style={{ paddingLeft: depth * 16 + 8 }}
+          style={{
+            ...mono, fontSize: 11, display: "flex", alignItems: "center", gap: 6,
+            width: "100%", textAlign: "left", padding: "5px 8px",
+            paddingLeft: depth * 14 + 8,
+            background: active ? "rgba(255,255,255,0.06)" : "transparent",
+            borderLeft: active ? "2px solid var(--accent-primary)" : "2px solid transparent",
+            color: active ? "var(--text-primary)" : "var(--text-tertiary)",
+            cursor: "pointer",
+          }}
         >
-          <FolderIcon className="w-3.5 h-3.5 text-primary" />
+          <FolderIcon style={{ width: 12, height: 12, flexShrink: 0 }} />
           {folder.name}
         </button>
         {children.map((c) => renderPickerItem(c, depth + 1))}
@@ -351,133 +372,126 @@ function NewFolderModal({
 
   return (
     <ModalOverlay onClose={onClose}>
-      <h2 className="text-base font-bold text-foreground mb-4">New Folder</h2>
-      <div className="flex flex-col gap-4">
-        <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 block">
-            Folder Name *
-          </label>
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => { setName(e.target.value); setError(""); }}
-            className={`w-full text-sm p-2.5 rounded-lg border ${
-              error ? "border-destructive" : "border-input"
-            } bg-background focus:outline-none focus:ring-1 focus:ring-ring`}
-            placeholder="Enter folder name"
-          />
-          {error && <p className="text-xs text-destructive mt-1">{error}</p>}
-        </div>
-        <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 block">
-            Description (optional)
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full text-sm p-2.5 rounded-lg border border-input bg-background resize-none h-16 focus:outline-none focus:ring-1 focus:ring-ring"
-            placeholder="Add a description"
-          />
-        </div>
-        <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 block">
-            Location
-          </label>
-          <div className="max-h-[150px] overflow-y-auto border border-border rounded-lg p-1 bg-muted/30">
-            {rootFolders.map((f) => renderPickerItem(f, 0))}
+      <div style={{ padding: "20px 24px" }}>
+        {/* Header */}
+        <p style={{ ...mono, fontSize: 13, fontWeight: 700, color: "var(--text-primary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
+          Nuova Cartella
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Name */}
+          <div>
+            <label style={labelStyle}>Nome Cartella *</label>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => { setName(e.target.value); setError(""); }}
+              style={{ ...inputStyle, borderColor: error ? "var(--color-error)" : "var(--glass-border)" }}
+              placeholder="→ nome cartella"
+            />
+            {error && <p style={{ ...mono, fontSize: 10, color: "var(--color-error)", marginTop: 4 }}>{error}</p>}
           </div>
-        </div>
-        <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 block">
-            Permissions
-          </label>
-          <div className="flex flex-col gap-2">
-            <label
-              className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                permMode === "inherit"
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:bg-accent/50"
-              }`}
-            >
-              <input
-                type="radio"
-                name="perm"
-                checked={permMode === "inherit"}
-                onChange={() => setPermMode("inherit")}
-                className="text-primary"
-              />
-              <span className="text-sm text-foreground">Inherit from parent (recommended)</span>
-            </label>
-            <label
-              className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                permMode === "custom"
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:bg-accent/50"
-              }`}
-            >
-              <input
-                type="radio"
-                name="perm"
-                checked={permMode === "custom"}
-                onChange={() => setPermMode("custom")}
-                className="text-primary"
-              />
-              <span className="text-sm text-foreground">Custom permissions</span>
-            </label>
+
+          {/* Description */}
+          <div>
+            <label style={labelStyle}>Descrizione (opzionale)</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              style={{ ...inputStyle, resize: "none", height: 60 }}
+              placeholder="→ aggiungi descrizione"
+            />
           </div>
-          {permMode === "custom" && (
-            <div className="flex flex-col gap-1.5 mt-3 border border-border rounded-lg p-2">
-              {ALL_USERS.map((u) => {
-                const p = customPerms.find((cp) => cp.userId === u.id);
+
+          {/* Location */}
+          <div>
+            <label style={labelStyle}>Posizione</label>
+            <div style={{ maxHeight: 140, overflowY: "auto", border: "1px solid var(--glass-border)", background: "var(--glass-bg)" }}>
+              {rootFolders.map((f) => renderPickerItem(f, 0))}
+            </div>
+          </div>
+
+          {/* Permissions */}
+          <div>
+            <label style={labelStyle}>Permessi</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {(["inherit", "custom"] as const).map((mode) => {
+                const active = permMode === mode;
                 return (
-                  <div key={u.id} className="flex items-center justify-between py-1">
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center bg-primary/15 text-primary text-[9px] font-bold">
-                        {u.displayName.charAt(0)}
-                      </div>
-                      <span className="text-xs text-foreground">{u.displayName}</span>
-                      <span className="text-[9px] text-muted-foreground">{u.role}</span>
-                    </div>
-                    <select
-                      className="text-[11px] p-0.5 rounded border border-input bg-background"
-                      value={p?.level || "read"}
-                      onChange={(e) => {
-                        const lv = e.target.value as PermissionLevel;
-                        setCustomPerms((prev) => {
-                          const next = prev.filter((x) => x.userId !== u.id);
-                          next.push({ userId: u.id, level: lv });
-                          return next;
-                        });
-                      }}
-                    >
-                      <option value="read">Read</option>
-                      <option value="write">Write</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </div>
+                  <label
+                    key={mode}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                      border: `1px solid ${active ? "var(--accent-primary)" : "var(--glass-border)"}`,
+                      background: active ? "rgba(212,255,0,0.04)" : "transparent",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input type="radio" name="perm" checked={active} onChange={() => setPermMode(mode)} style={{ accentColor: "var(--accent-primary)" }} />
+                    <span style={{ ...mono, fontSize: 11, color: active ? "var(--text-primary)" : "var(--text-tertiary)" }}>
+                      {mode === "inherit" ? "Eredita dal genitore (consigliato)" : "Permessi personalizzati"}
+                    </span>
+                  </label>
                 );
               })}
             </div>
-          )}
+
+            {permMode === "custom" && (
+              <div style={{ marginTop: 10, border: "1px solid var(--glass-border)", background: "var(--glass-bg)" }}>
+                {ALL_USERS.map((u) => {
+                  const p = customPerms.find((cp) => cp.userId === u.id);
+                  return (
+                    <div key={u.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", borderBottom: "1px solid var(--glass-border)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 20, height: 20, background: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ ...mono, fontSize: 9, fontWeight: 700, color: "#000" }}>{u.displayName.charAt(0)}</span>
+                        </div>
+                        <span style={{ ...mono, fontSize: 11, color: "var(--text-primary)" }}>{u.displayName}</span>
+                        <span style={{ ...mono, fontSize: 9, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{u.role}</span>
+                      </div>
+                      <select
+                        style={{ ...mono, fontSize: 10, padding: "2px 4px", background: "var(--sosa-bg)", border: "1px solid var(--glass-border)", color: "var(--text-primary)" }}
+                        value={p?.level || "read"}
+                        onChange={(e) => {
+                          const lv = e.target.value as PermissionLevel;
+                          setCustomPerms((prev) => {
+                            const next = prev.filter((x) => x.userId !== u.id);
+                            next.push({ userId: u.id, level: lv });
+                            return next;
+                          });
+                        }}
+                      >
+                        <option value="read">Read</option>
+                        <option value="write">Write</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="flex gap-2 justify-end mt-5">
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm px-4 py-2 rounded-lg border border-border bg-background hover:bg-accent transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={!canCreate}
-          className="text-sm px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-          title={!canCreate ? "You don't have permission to create folders here" : undefined}
-        >
-          Create Folder
-        </button>
+
+        {/* Footer */}
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--glass-border)" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ ...mono, fontSize: 11, padding: "8px 16px", background: "transparent", border: "1px solid var(--glass-border)", color: "var(--text-tertiary)", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.06em" }}
+          >
+            Annulla
+          </button>
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={!canCreate}
+            title={!canCreate ? "Permessi insufficienti" : undefined}
+            style={{ ...mono, fontSize: 11, padding: "8px 16px", background: canCreate ? "var(--accent-primary)" : "var(--glass-bg)", border: "1px solid var(--glass-border)", color: canCreate ? "#000" : "var(--text-tertiary)", cursor: canCreate ? "pointer" : "not-allowed", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}
+          >
+            Crea Cartella ↗
+          </button>
+        </div>
       </div>
     </ModalOverlay>
   );
@@ -487,7 +501,7 @@ function NewFolderModal({
 const CloudPage = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { currentPortalId } = usePortalDB();
+  const { currentPortalId, isOwner: isPortalOwner, isAdmin: isPortalAdmin } = usePortalDB();
   const cloudFiles = useCloudFiles();
 
   // ── State: Data ──
@@ -584,8 +598,8 @@ const CloudPage = () => {
   // ── Derived ──
   const userRole = user?.role || "member";
   const userId = user?.id || "";
-  const isOwnerOrAdmin = userRole === "owner" || userRole === "admin";
-  const isOwner = userRole === "owner";
+  const isOwnerOrAdmin = isPortalOwner || isPortalAdmin || userRole === "owner" || userRole === "admin";
+  const isOwner = isPortalOwner || userRole === "owner";
 
   // ── Persist to localStorage ──
   useEffect(() => { localStorage.setItem(STORAGE_CLOUD_FOLDERS, JSON.stringify(folders)); }, [folders]);
@@ -622,9 +636,11 @@ const CloudPage = () => {
 
   // ── Computed values ──
   const getPerm = useCallback(
-    (folderId: string): PermissionLevel | null =>
-      getUserPermission(folderId, userId, userRole, folders),
-    [userId, userRole, folders]
+    (folderId: string): PermissionLevel | null => {
+      if (isPortalOwner || isPortalAdmin) return "admin";
+      return getUserPermission(folderId, userId, userRole, folders);
+    },
+    [isPortalOwner, isPortalAdmin, userId, userRole, folders]
   );
 
   const isFolderUnlocked = useCallback(
@@ -1056,23 +1072,34 @@ const CloudPage = () => {
   const handleDownload = useCallback(async (fileId: string) => {
     const url = await cloudFiles.getDownloadUrl(fileId);
     if (!url) { toast.error("Could not generate download link"); return; }
-    window.open(url, "_blank", "noopener,noreferrer");
-  }, [cloudFiles]);
+    const file = files.find((f) => f.id === fileId);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = file?.name ?? fileId;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+    } catch {
+      toast.error("Download failed");
+    }
+  }, [cloudFiles, files]);
 
   const updateFileDescription = (_fileId: string, _desc: string) => {
     // Description editing is not persisted to the DB layer (acceptable known limitation).
   };
 
-  const handleRealUpload = async (actualFiles: File[]) => {
-    if (!currentFolderId) {
-      toast.error("Select a folder first");
-      return;
-    }
+  const handleRealUpload = async (actualFiles: File[], folderId: string) => {
     let successCount = 0;
-    const folderName = folders.find((f) => f.id === currentFolderId)?.name || "Root";
+    const folderName = folders.find((f) => f.id === folderId)?.name || folderId;
     for (const file of actualFiles) {
       try {
-        await cloudFiles.upload(file, currentFolderId);
+        await cloudFiles.upload(file, folderId);
         successCount++;
       } catch (err) {
         toast.error(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : "Unknown error"}`);
@@ -1510,6 +1537,7 @@ const CloudPage = () => {
                 onRenameFile={(id, name) => renameFile(id, name)}
                 onMoveFile={(f) => { setMoveFileModal(f); setMoveTarget(null); }}
                 onOpenUpload={() => setShowUploadModal(true)}
+                onDownloadFile={handleDownload}
               />
             ) : showTrash ? (
               <>
@@ -2034,6 +2062,9 @@ const CloudPage = () => {
             onMoveFile={(f) => { setMoveFileModal(f); setMoveTarget(null); }}
             onNavigateFolder={navigateFolder}
             onUpdateDescription={updateFileDescription}
+            onDownload={handleDownload}
+            getPreviewUrl={(id) => cloudFiles.getDownloadUrl(id)}
+            isOwner={isOwner}
           />
         )}
       </div>

@@ -32,6 +32,7 @@ interface StorageOverviewProps {
   onRenameFile: (fileId: string, newName: string) => void;
   onMoveFile: (file: CloudFile) => void;
   onOpenUpload?: () => void;
+  onDownloadFile: (fileId: string) => Promise<void>;
 }
 
 /* ── Helpers ── */
@@ -65,7 +66,7 @@ function formatExactBytes(bytes: number): string {
 /* ── Component ── */
 export default function StorageOverview({
   files, folders, userId, userRole, getPerm,
-  onNavigateFolder, onPreviewFile, onMoveToTrash, onRenameFile, onMoveFile, onOpenUpload,
+  onNavigateFolder, onPreviewFile, onMoveToTrash, onRenameFile, onMoveFile, onOpenUpload, onDownloadFile,
 }: StorageOverviewProps) {
   const isMobile = useIsMobile();
   const [viewFilter, setViewFilter] = useState<ViewFilter>("all");
@@ -220,7 +221,7 @@ export default function StorageOverview({
     const perm = getPerm(file.folderId);
     const canW = perm === "write" || perm === "admin";
     return [
-      { id: "download", icon: <Download className="w-3.5 h-3.5" />, label: "Download", onClick: () => toast.info("Download started") },
+      { id: "download", icon: <Download className="w-3.5 h-3.5" />, label: "Download", onClick: () => { void onDownloadFile(file.id); } },
       { id: "view-folder", icon: <FolderIcon className="w-3.5 h-3.5" />, label: "View in folder", onClick: () => onNavigateFolder(file.folderId) },
       { id: "rename", icon: <Pencil className="w-3.5 h-3.5" />, label: "Rename", onClick: () => {
         const newName = prompt("New name:", file.name);
@@ -466,8 +467,15 @@ export default function StorageOverview({
       )}
 
       {/* ── LARGEST ITEMS HEADER ── */}
-      <div style={{ padding: "4px 16px 2px", borderTop: "1px solid var(--sosa-border)" }}>
+      <div style={{ padding: "4px 16px 2px", borderTop: "1px solid var(--sosa-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <p style={{ ...monoXs, color: "var(--text-tertiary)", fontWeight: 700, padding: "8px 0 4px" }}>Largest Items</p>
+        {onOpenUpload && (
+          <button type="button" onClick={onOpenUpload}
+            style={{ display: "flex", alignItems: "center", gap: 5, ...monoXs, fontWeight: 700, padding: "4px 10px", background: "var(--portal-accent)", color: "#000", border: "none", borderRadius: 0, cursor: "pointer" }}
+          >
+            <Upload style={{ width: 10, height: 10 }} /> Upload ↑
+          </button>
+        )}
       </div>
 
       {/* ── FILTER BAR ── */}
@@ -645,7 +653,10 @@ export default function StorageOverview({
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button type="button"
-              onClick={() => toast.info("Download started")}
+              onClick={() => {
+                const ids = Array.from(selectedIds);
+                ids.forEach((id, i) => { setTimeout(() => { void onDownloadFile(id); }, i * 300); });
+              }}
               style={{ display: "flex", alignItems: "center", gap: 5, ...monoSm, padding: "4px 12px", background: "transparent", color: "var(--text-tertiary)", border: "1px solid var(--sosa-border)", borderRadius: 0, cursor: "pointer" }}
             >
               <Download style={{ width: 11, height: 11 }} /> Download

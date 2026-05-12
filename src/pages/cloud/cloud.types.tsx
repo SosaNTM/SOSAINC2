@@ -85,8 +85,8 @@ export function ModalOverlay({
 }) {
   return (
     <>
-      <div className="fixed inset-0 z-[80] bg-black/50" onClick={onClose} />
-      <div className="fixed z-[90] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-[460px] max-h-[90vh] overflow-y-auto bg-popover border border-border rounded-2xl p-6 shadow-2xl">
+      <div className="fixed inset-0 z-[80]" style={{ background: "rgba(0,0,0,0.72)" }} onClick={onClose} />
+      <div className="fixed z-[90] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-[480px] max-h-[90vh] overflow-y-auto" style={{ background: "var(--sosa-bg)", border: "1px solid var(--glass-border)" }}>
         {children}
       </div>
     </>

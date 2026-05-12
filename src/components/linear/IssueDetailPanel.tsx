@@ -296,9 +296,6 @@ export function IssueDetailPanel({
 
         {/* Actions */}
         <div className="flex items-center gap-3 pt-2" style={{ borderTop: "0.5px solid #e5e7eb", paddingTop: 12 }}>
-          <button type="button" onClick={() => {}} style={{ fontSize: 11, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-            <Copy className="w-3 h-3" /> Duplicate
-          </button>
           <button type="button" onClick={() => { navigator.clipboard?.writeText(issue.id); }} style={{ fontSize: 11, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
             <Link2 className="w-3 h-3" /> Copy ID
           </button>

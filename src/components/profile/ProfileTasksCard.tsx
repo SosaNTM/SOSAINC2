@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from "react";
 import { CheckSquare, Clock, RefreshCw } from "lucide-react";
 import { format, isPast, isToday } from "date-fns";
-import { STORAGE_TASKS } from "@/constants/storageKeys";
+import { tasksKey } from "@/constants/storageKeys";
 import { loadTasksFromSupabase } from "@/lib/taskSync";
 import { ISSUE_PRIORITIES, type Issue } from "@/lib/linearStore";
 import { usePortal } from "@/lib/portalContext";
@@ -16,9 +16,9 @@ const STATUS_COLS: { key: string; label: string; color: string; match: string[] 
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function parseStoredTasks(): Issue[] {
+function parseStoredTasks(portalId: string): Issue[] {
   try {
-    const saved = localStorage.getItem(STORAGE_TASKS);
+    const saved = localStorage.getItem(tasksKey(portalId));
     if (!saved) return [];
     return JSON.parse(saved).map((t: any) => ({
       ...t,
@@ -41,7 +41,7 @@ export function ProfileTasksCard({ userId }: ProfileTasksCardProps) {
   const { portal } = usePortal();
   const portalId = portal?.id ?? "sosa";
 
-  const [allTasks, setAllTasks] = useState<Issue[]>(parseStoredTasks);
+  const [allTasks, setAllTasks] = useState<Issue[]>(() => parseStoredTasks(portalId));
   const [syncing, setSyncing] = useState(false);
 
   // Initial Supabase fetch
@@ -54,14 +54,14 @@ export function ProfileTasksCard({ userId }: ProfileTasksCardProps) {
 
   // Live sync: re-read localStorage whenever TasksPage writes to it
   useEffect(() => {
-    const sync = () => setAllTasks(parseStoredTasks());
+    const sync = () => setAllTasks(parseStoredTasks(portalId));
     window.addEventListener("SOSA INC:tasks-changed", sync);
     window.addEventListener("storage", sync); // cross-tab fallback
     return () => {
       window.removeEventListener("SOSA INC:tasks-changed", sync);
       window.removeEventListener("storage", sync);
     };
-  }, []);
+  }, [portalId]);
 
   // Filter: assigned to this user, exclude backlog & cancelled
   const myTasks = allTasks.filter(

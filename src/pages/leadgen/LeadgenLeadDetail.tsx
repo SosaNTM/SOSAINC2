@@ -9,7 +9,6 @@ import { supabase } from "@/lib/supabase";
 import { usePortalDB } from "@/lib/portalContextDB";
 import { STATUS_CONFIG } from "@/components/leadgen/LeadOutreachStatusBadge";
 import { useLeadgenLeadNotes } from "@/hooks/leadgen/useLeadgenLeadNotes";
-import { usePortalMembers } from "@/hooks/leadgen/usePortalMembers";
 import type { LeadgenLead, LeadgenOutreachEvent, OutreachStatus, OutreachChannel, OutreachDirection } from "@/types/leadgen";
 import { broadcastLeadgenUpdate } from "@/lib/leadgenRealtime";
 import { useLeadgenMembers, type LeadgenMemberWithProfile } from "@/hooks/leadgen/useLeadgenMembers";
@@ -75,12 +74,14 @@ function ReassignModal({ lead, teamMembers, onClose, onSaved }: {
 
     const isRelease = selectedUserId === "";
 
-    await supabase.from("leadgen_leads").update({
+    const { error } = await supabase.from("leadgen_leads").update({
       assigned_to: isRelease ? null : selectedUserId,
       assigned_at: isRelease ? null : now,
       assigned_by: user?.id ?? null,
       last_activity_at: now,
     }).eq("portal_id", currentPortalId).eq("id", lead.id);
+
+    if (error) { toast.error(error.message); setSaving(false); return; }
 
     const targetMember = teamMembers.find((m) => m.user_id === selectedUserId);
     await supabase.from("leadgen_outreach_events").insert({
@@ -170,10 +171,16 @@ export default function LeadgenLeadDetail() {
   const [editNoteDraft, setEditNoteDraft] = useState("");
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
 
+  const [contactName, setContactName] = useState("");
+  const [contactRole, setContactRole] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [editingContact, setEditingContact] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
+
   const { notes, addNote, deleteNote, updateNote } = useLeadgenLeadNotes(id);
-  const { members } = usePortalMembers();
-  const memberMap = new Map(members.map((m) => [m.user_id, m.display_name ?? m.email]));
   const { members: teamMembers, currentMember } = useLeadgenMembers();
+  const memberMap = new Map(teamMembers.map((m) => [m.user_id, m.display_name ?? m.user_id]));
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showReassign, setShowReassign] = useState(false);
 
@@ -195,12 +202,58 @@ export default function LeadgenLeadDetail() {
       setStatus(l.outreach_status);
       setOutreachNotes(l.outreach_notes ?? "");
       setAssignedTo(l.assigned_to ?? "");
+      setContactName(l.contact_name ?? "");
+      setContactRole(l.contact_role ?? "");
+      setContactEmail(l.contact_email ?? "");
+      setContactPhone(l.contact_phone ?? "");
     }
     setEvents((eventsRows ?? []) as LeadgenOutreachEvent[]);
     setLoading(false);
   }, [id, currentPortalId]);
 
   useEffect(() => { refetchLead(); }, [refetchLead]);
+
+  const handleSaveContact = async () => {
+    if (!lead || !currentPortalId) return;
+    setSavingContact(true);
+    const { error } = await supabase
+      .from("leadgen_leads")
+      .update({
+        contact_name: contactName.trim() || null,
+        contact_role: contactRole.trim() || null,
+        contact_email: contactEmail.trim() || null,
+        contact_phone: contactPhone.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", lead.id).eq("portal_id", currentPortalId);
+    setSavingContact(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Contatto aggiornato");
+      setLead((prev) => prev ? { ...prev, contact_name: contactName.trim() || null, contact_role: contactRole.trim() || null, contact_email: contactEmail.trim() || null, contact_phone: contactPhone.trim() || null } : prev);
+      setEditingContact(false);
+    }
+  };
+
+  const [assigningSelf, setAssigningSelf] = useState(false);
+  const handleAssignSelf = async () => {
+    if (!lead || !currentPortalId || !currentUserId) return;
+    setAssigningSelf(true);
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("leadgen_leads").update({
+      assigned_to: currentUserId,
+      assigned_at: now,
+      assigned_by: currentUserId,
+      last_activity_at: now,
+      updated_at: now,
+    }).eq("id", lead.id).eq("portal_id", currentPortalId);
+    if (error) { toast.error(error.message); setAssigningSelf(false); return; }
+    setAssignedTo(currentUserId);
+    setLead((prev) => prev ? { ...prev, assigned_to: currentUserId, assigned_at: now } : prev);
+    broadcastLeadgenUpdate("lead_updated", { leadId: lead.id });
+    toast.success("Lead assegnato a te");
+    setAssigningSelf(false);
+  };
 
   const handleSaveMeta = async () => {
     if (!lead || !currentPortalId) return;
@@ -451,103 +504,104 @@ export default function LeadgenLeadDetail() {
               {lead.city       && <InfoRow label="Città">{lead.city}{lead.postal_code ? ` — ${lead.postal_code}` : ""}</InfoRow>}
               {lead.phone      && <InfoRow label="Telefono"><a href={`tel:${lead.phone}`} style={{ color: "var(--accent-primary)", textDecoration: "none" }}>{lead.phone}</a></InfoRow>}
               {lead.website    && <InfoRow label="Sito web"><a href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-primary)", textDecoration: "none" }}>{lead.website}</a></InfoRow>}
+              {lead.emails?.length > 0 && (
+                <InfoRow label="Email azienda">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {lead.emails.map((e) => (
+                      <a key={e} href={`mailto:${e}`} style={{ color: "var(--accent-primary)", textDecoration: "none", fontFamily: "var(--font-mono)", fontSize: 12 }}>{e}</a>
+                    ))}
+                  </div>
+                </InfoRow>
+              )}
               {lead.rating     && <InfoRow label="Rating"><Stars rating={lead.rating} /> <span style={{ marginLeft: 6 }}>{lead.rating.toFixed(1)} / 5 ({lead.reviews_count ?? 0} rec.)</span></InfoRow>}
               {lead.category   && <InfoRow label="Categoria">{lead.category}</InfoRow>}
               <InfoRow label="Paese">{lead.country_code ?? "—"}</InfoRow>
             </div>
           </div>
 
-          {/* Contacts card */}
-          {(lead.emails?.length > 0 || Object.keys(lead.social_media ?? {}).length > 0) && (
-            <div style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)", padding: 20 }}>
-              <p style={sectionLabel}>Contatti estratti</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {lead.emails?.map((email) => (
-                  <a key={email} href={`mailto:${email}`} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--accent-primary)", textDecoration: "none" }}>
-                    <Mail size={12} /> {email}
-                  </a>
-                ))}
-                {Object.entries(lead.social_media ?? {}).map(([platform, handle]) => handle && (
-                  <div key={platform} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", width: 72 }}>{platform}</span>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)" }}>{handle as string}</span>
-                    <ExternalLink size={10} color="var(--text-tertiary)" />
+          {/* Contatto principale — editable */}
+          <div style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)", padding: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <p style={{ ...sectionLabel, marginBottom: 0 }}>Contatto principale</p>
+              {!editingContact ? (
+                <button
+                  onClick={() => setEditingContact(true)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid var(--glass-border)", padding: "4px 10px", fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", cursor: "pointer", letterSpacing: "0.06em" }}
+                >
+                  <Pencil size={10} /> Modifica
+                </button>
+              ) : (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => { setEditingContact(false); setContactName(lead.contact_name ?? ""); setContactRole(lead.contact_role ?? ""); setContactEmail(lead.contact_email ?? ""); setContactPhone(lead.contact_phone ?? ""); }}
+                    style={{ background: "none", border: "1px solid var(--glass-border)", cursor: "pointer", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10, padding: "4px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <XIcon2 size={10} /> Annulla
+                  </button>
+                  <button onClick={handleSaveContact} disabled={savingContact}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "var(--accent-primary)", border: "none", padding: "4px 12px", fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#000", cursor: "pointer", letterSpacing: "0.06em" }}>
+                    {savingContact ? <Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={10} />} Salva
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {editingContact ? (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                {[
+                  { label: "Nome titolare", value: contactName, set: setContactName, placeholder: "Mario Rossi" },
+                  { label: "Ruolo / Posizione", value: contactRole, set: setContactRole, placeholder: "Proprietario" },
+                  { label: "Email personale", value: contactEmail, set: setContactEmail, placeholder: "mario@email.com" },
+                  { label: "Telefono personale", value: contactPhone, set: setContactPhone, placeholder: "+39 333 000 0000" },
+                ].map(({ label, value, set, placeholder }) => (
+                  <div key={label}>
+                    <label style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-tertiary)", display: "block", marginBottom: 5 }}>
+                      {label}
+                    </label>
+                    <input
+                      value={value}
+                      onChange={(e) => set(e.target.value)}
+                      placeholder={placeholder}
+                      className="glass-input"
+                      style={{ width: "100%", fontSize: 12 }}
+                    />
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {lead.contact_name  && <InfoRow label="Nome titolare">{lead.contact_name}</InfoRow>}
+                {lead.contact_role  && <InfoRow label="Ruolo">{lead.contact_role}</InfoRow>}
+                {lead.contact_email && <InfoRow label="Email personale"><a href={`mailto:${lead.contact_email}`} style={{ color: "var(--accent-primary)", textDecoration: "none" }}>{lead.contact_email}</a></InfoRow>}
+                {lead.contact_phone && <InfoRow label="Telefono personale"><a href={`tel:${lead.contact_phone}`} style={{ color: "var(--accent-primary)", textDecoration: "none" }}>{lead.contact_phone}</a></InfoRow>}
+                {!lead.contact_name && !lead.contact_email && !lead.contact_phone && (
+                  <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)", gridColumn: "span 2" }}>
+                    Nessun contatto personale. Clicca Modifica per aggiungere.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
 
           {/* Outreach CRM */}
           <div style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)", padding: 20 }}>
             <p style={sectionLabel}>Gestione outreach</p>
 
-            {/* Assignment */}
-            {members.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)", display: "block", marginBottom: 6 }}>
-                  Assegnato a
-                </label>
-                <select
-                  value={assignedTo}
-                  onChange={(e) => setAssignedTo(e.target.value)}
-                  className="glass-input"
-                  style={{ width: "100%", fontSize: 12 }}
-                >
-                  <option value="">— Nessuno —</option>
-                  {members.map((m) => (
-                    <option key={m.user_id} value={m.user_id}>
-                      {m.display_name ?? m.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {currentUserId && lead.assigned_to !== currentUserId && (
+              <button
+                onClick={handleAssignSelf}
+                disabled={assigningSelf || readOnly}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 7,
+                  padding: "9px 16px", background: "var(--accent-primary)", border: "none",
+                  fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "#000",
+                  cursor: assigningSelf || readOnly ? "not-allowed" : "pointer",
+                  letterSpacing: "0.06em", textTransform: "uppercase", opacity: readOnly ? 0.4 : 1,
+                }}
+              >
+                {assigningSelf ? <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Plus size={12} />}
+                Prendi in carico ↗
+              </button>
             )}
-
-            {/* Status */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)", display: "block", marginBottom: 8 }}>
-                Status
-              </label>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {(Object.entries(STATUS_CONFIG) as [OutreachStatus, typeof STATUS_CONFIG[OutreachStatus]][]).map(([k, v]) => (
-                  <button
-                    key={k} type="button" onClick={() => setStatus(k)}
-                    style={{
-                      padding: "6px 12px",
-                      fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700,
-                      letterSpacing: "0.08em", textTransform: "uppercase",
-                      background: status === k ? `color-mix(in srgb, ${v.color} 20%, transparent)` : "transparent",
-                      border: `1px solid ${status === k ? v.color : "var(--glass-border)"}`,
-                      color: status === k ? v.color : "var(--text-tertiary)",
-                      cursor: "pointer", transition: "all 0.1s",
-                    }}
-                  >
-                    {v.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Outreach notes */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)", display: "block", marginBottom: 6 }}>
-                Note outreach
-              </label>
-              <textarea
-                value={outreachNotes}
-                onChange={(e) => setOutreachNotes(e.target.value)}
-                placeholder="Appunti, osservazioni, prossimi step..."
-                className="glass-input"
-                rows={3}
-                style={{ width: "100%", resize: "vertical" }}
-              />
-            </div>
-
-            <button onClick={handleSaveMeta} disabled={savingMeta || readOnly} className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6, ...(readOnly ? { opacity: 0.4, cursor: "not-allowed" } : {}) }}>
-              {savingMeta && <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />}
-              Salva
-            </button>
           </div>
 
           {/* Notes card */}

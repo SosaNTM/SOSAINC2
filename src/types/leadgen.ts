@@ -87,6 +87,10 @@ export interface LeadgenLead {
   outreach_status: OutreachStatus;
   outreach_notes: string | null;
   contacted_at: string | null;
+  contact_name: string | null;
+  contact_role: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
   created_at: string;
   updated_at: string;
 }

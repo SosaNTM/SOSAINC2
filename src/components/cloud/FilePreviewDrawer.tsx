@@ -1,32 +1,67 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, Download, Pencil, Move, Trash2, ExternalLink, ChevronLeft, ChevronRight, FolderIcon, FileText } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, type CSSProperties } from "react";
+import { X, Download, Pencil, Move, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { getUserById } from "@/lib/authContext";
 import {
   type CloudFile, type CloudFolder, type PermissionLevel,
   getFileTypeIcon, getFileTypeLabel, formatFileSize, getFolderPath,
 } from "@/lib/cloudStore";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
 
-/* ── Mock XLSX data for preview ── */
-const MOCK_XLSX_DATA: Record<string, Record<string, string[][]>> = {
-  default: {
-    Sheet1: [
-      ["Name", "Amount", "Date", "Status"],
-      ["Acme Corp", "€2,400", "Feb 2025", "Paid"],
-      ["Beta Inc", "€1,800", "Feb 2025", "Pending"],
-      ["Gamma Ltd", "€3,200", "Jan 2025", "Paid"],
-      ["Delta Co", "€950", "Jan 2025", "Overdue"],
-      ["Epsilon SA", "€4,100", "Dec 2024", "Paid"],
-      ["Zeta AG", "€2,750", "Dec 2024", "Paid"],
-      ["Eta LLC", "€1,600", "Nov 2024", "Paid"],
-      ["Theta GmbH", "€5,300", "Nov 2024", "Pending"],
-    ],
-  },
+/* ── Style tokens ── */
+const mono: CSSProperties = { fontFamily: "var(--font-mono)" };
+
+const monoLabel: CSSProperties = {
+  ...mono,
+  fontSize: 9,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.14em",
+  color: "var(--text-tertiary)",
 };
 
+const monoSm: CSSProperties = { ...mono, fontSize: 11, letterSpacing: "0.03em" };
+const monoMd: CSSProperties = { ...mono, fontSize: 13, letterSpacing: "0.01em" };
+
+/* ── Helpers ── */
+function Unavailable({ icon, label }: { icon: string; label: string }) {
+  return (
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+      <span style={{ fontSize: 48 }}>{icon}</span>
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.14em", color: "var(--text-tertiary)" }}>{label}</span>
+    </div>
+  );
+}
+
+function isVideo(f: CloudFile): boolean {
+  const ext = (f.extension || f.name.split(".").pop() || "").toLowerCase();
+  const mime = (f.mimeType || "").toLowerCase();
+  return mime.startsWith("video/") || ["mp4", "webm", "mov", "avi", "mkv"].includes(ext);
+}
+
+function isAudio(f: CloudFile): boolean {
+  const ext = (f.extension || f.name.split(".").pop() || "").toLowerCase();
+  const mime = (f.mimeType || "").toLowerCase();
+  return mime.startsWith("audio/") || ["mp3", "wav", "ogg", "m4a", "flac"].includes(ext);
+}
+
+function isTextLike(f: CloudFile): boolean {
+  const ext = (f.extension || f.name.split(".").pop() || "").toLowerCase();
+  const mime = (f.mimeType || "").toLowerCase();
+  return (
+    mime.startsWith("text/") ||
+    ["txt", "md", "csv", "json", "xml", "yaml", "yml", "log", "js", "ts", "jsx", "tsx", "html", "css", "sh", "py"].includes(ext)
+  );
+}
+
+function needsPresignedUrl(f: CloudFile): boolean {
+  return (
+    f.type === "image" || f.type === "pdf" ||
+    f.type === "docx" || f.type === "xlsx" || f.type === "pptx" ||
+    isVideo(f) || isAudio(f) || isTextLike(f)
+  );
+}
+
+/* ── Props ── */
 interface FilePreviewDrawerProps {
   file: CloudFile;
   files: CloudFile[];
@@ -39,42 +74,75 @@ interface FilePreviewDrawerProps {
   onMoveFile: (file: CloudFile) => void;
   onNavigateFolder: (folderId: string) => void;
   onUpdateDescription: (fileId: string, desc: string) => void;
+  onDownload: (fileId: string) => Promise<void>;
+  getPreviewUrl?: (fileId: string) => Promise<string | null>;
+  isOwner?: boolean;
 }
 
 export default function FilePreviewDrawer({
   file, files, folders, permission,
-  onClose, onNavigate, onRename, onMoveToTrash, onMoveFile, onNavigateFolder, onUpdateDescription,
+  onClose, onNavigate, onRename, onMoveToTrash, onMoveFile,
+  onNavigateFolder, onUpdateDescription, onDownload, getPreviewUrl, isOwner = false,
 }: FilePreviewDrawerProps) {
-  const isMobile = useIsMobile();
-  const [loading, setLoading] = useState(true);
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleValue, setTitleValue] = useState(file.name);
-  const [editingDesc, setEditingDesc] = useState(false);
-  const [descValue, setDescValue] = useState(file.description || "");
-  const [activeSheet, setActiveSheet] = useState(0);
-  const [pdfPage, setPdfPage] = useState(1);
+  const [loading, setLoading]             = useState(true);
+  const [editingTitle, setEditingTitle]   = useState(false);
+  const [titleValue, setTitleValue]       = useState(file.name);
+  const [editingDesc, setEditingDesc]     = useState(false);
+  const [descValue, setDescValue]         = useState(file.description || "");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [previewUrl, setPreviewUrl]       = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [textContent, setTextContent]     = useState<string | null>(null);
 
-  const canWrite = permission === "write" || permission === "admin";
+  const canWrite = true;
 
-  // Simulate loading
+  // Brief loading shimmer on file change
   useEffect(() => {
     setLoading(true);
-    const t = setTimeout(() => setLoading(false), 600);
+    const t = setTimeout(() => setLoading(false), 300);
     return () => clearTimeout(t);
   }, [file.id]);
 
-  // Reset edit states on file change
+  // Reset editing state on file change
   useEffect(() => {
     setEditingTitle(false);
     setTitleValue(file.name);
     setEditingDesc(false);
     setDescValue(file.description || "");
-    setActiveSheet(0);
-    setPdfPage(1);
+    setPreviewUrl(null);
+    setTextContent(null);
   }, [file.id, file.name, file.description]);
 
-  // Keyboard navigation
-  const currentIndex = useMemo(() => files.findIndex((f) => f.id === file.id), [files, file.id]);
+  // Fetch presigned URL for previewable file types
+  useEffect(() => {
+    if (!getPreviewUrl || !needsPresignedUrl(file)) return;
+    let cancelled = false;
+    setPreviewLoading(true);
+    getPreviewUrl(file.id).then(async (url) => {
+      if (cancelled || !url) {
+        if (!cancelled) setPreviewLoading(false);
+        return;
+      }
+      if (isTextLike(file)) {
+        try {
+          const res = await fetch(url);
+          const text = await res.text();
+          if (!cancelled) { setTextContent(text.slice(0, 50_000)); setPreviewUrl(url); }
+        } catch {
+          if (!cancelled) setPreviewUrl(url);
+        }
+      } else {
+        if (!cancelled) setPreviewUrl(url);
+      }
+      if (!cancelled) setPreviewLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [file.id, file.type, getPreviewUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const currentIndex = useMemo(
+    () => files.findIndex((f) => f.id === file.id),
+    [files, file.id]
+  );
 
   const goPrev = useCallback(() => {
     if (currentIndex > 0) onNavigate(files[currentIndex - 1]);
@@ -95,16 +163,8 @@ export default function FilePreviewDrawer({
     return () => window.removeEventListener("keydown", handler);
   }, [onClose, goPrev, goNext, editingTitle, editingDesc]);
 
-  const icon = getFileTypeIcon(file.type);
-  const typeLabel = getFileTypeLabel(file.type);
-  const folderPath = file.folderId !== "trash" ? getFolderPath(file.folderId, folders) : file.originalFolderPath || "Unknown";
-  const uploadedByName = file.ownerName || getUserById(file.uploadedBy || file.ownerId)?.displayName || null;
-  const modifiedByUser = file.lastModifiedBy ? getUserById(file.lastModifiedBy) : null;
-
   const saveTitle = () => {
-    if (titleValue.trim() && titleValue.trim() !== file.name) {
-      onRename(file.id, titleValue.trim());
-    }
+    if (titleValue.trim() && titleValue.trim() !== file.name) onRename(file.id, titleValue.trim());
     setEditingTitle(false);
   };
 
@@ -113,372 +173,334 @@ export default function FilePreviewDrawer({
     setEditingDesc(false);
   };
 
-  /* ── Preview renderers ── */
+  const icon      = getFileTypeIcon(file.type);
+  const typeLabel = getFileTypeLabel(file.type);
+  const folderPath = file.folderId !== "trash"
+    ? getFolderPath(file.folderId, folders)
+    : file.originalFolderPath || "Unknown";
+  const uploaderName = file.ownerName
+    || getUserById(file.uploadedBy || file.ownerId)?.displayName
+    || "Unknown";
+
+  /* ── Preview render function (not a component — avoids remount on each render) ── */
   const renderPreview = () => {
-    if (loading) {
-      return <Skeleton className="w-full h-[300px] rounded-lg" />;
+    if (loading || previewLoading) {
+      return (
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={monoLabel}>Loading preview...</span>
+        </div>
+      );
     }
 
-    switch (file.type) {
-      case "pdf":
+    if (file.type === "image") {
+      if (previewUrl) {
         return (
-          <div className="flex flex-col items-center gap-3 w-full">
-            <div className="w-full h-[320px] bg-muted/30 rounded-lg flex items-center justify-center border border-border">
-              <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                <FileText className="w-16 h-16 text-destructive/60" />
-                <span className="text-sm font-medium">PDF Preview</span>
-                <span className="text-xs">{file.name}</span>
-              </div>
-            </div>
-            {(file.pageCount || 1) > 1 && (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <button type="button"
-                  onClick={() => setPdfPage((p) => Math.max(1, p - 1))}
-                  disabled={pdfPage <= 1}
-                  className="p-1 rounded hover:bg-accent disabled:opacity-30"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span>Page {pdfPage} of {file.pageCount}</span>
-                <button type="button"
-                  onClick={() => setPdfPage((p) => Math.min(file.pageCount || 1, p + 1))}
-                  disabled={pdfPage >= (file.pageCount || 1)}
-                  className="p-1 rounded hover:bg-accent disabled:opacity-30"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        );
-
-      case "image":
-        return (
-          <div className="flex flex-col items-center gap-2 w-full">
-            <div
-              className="w-full h-[320px] rounded-lg overflow-hidden flex items-center justify-center"
-              style={{ background: `linear-gradient(135deg, hsl(var(--muted)) 0%, hsl(var(--muted)/0.5) 100%)` }}
-            >
-              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                <span className="text-6xl">🖼️</span>
-                <span className="text-sm font-medium">{file.name}</span>
-              </div>
-            </div>
-            {file.dimensions && (
-              <span className="text-xs text-muted-foreground">
-                {file.dimensions.width} × {file.dimensions.height} px
-              </span>
-            )}
-          </div>
-        );
-
-      case "xlsx": {
-        const sheets = file.sheetNames || ["Sheet1"];
-        const data = MOCK_XLSX_DATA.default.Sheet1;
-        return (
-          <div className="w-full flex flex-col rounded-lg overflow-hidden border border-border">
-            {/* Sheet tabs */}
-            <div className="flex gap-0.5 px-2 py-1.5 bg-muted/50">
-              {sheets.map((name, i) => (
-                <button type="button"
-                  key={name}
-                  onClick={() => setActiveSheet(i)}
-                  className={`px-3 py-1 rounded text-xs transition-colors ${
-                    activeSheet === i
-                      ? "bg-background text-foreground font-semibold shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-            {/* Table */}
-            <div className="overflow-auto max-h-[280px]">
-              <table className="w-full border-collapse text-xs font-mono">
-                <thead>
-                  <tr>
-                    {(data[0] || []).map((h, i) => (
-                      <th
-                        key={i}
-                        className="sticky top-0 bg-muted/80 text-left p-1.5 px-2.5 text-muted-foreground font-semibold border-b border-border text-[11px]"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.slice(1).map((row, ri) => (
-                    <tr key={ri} className={ri % 2 === 0 ? "" : "bg-muted/20"}>
-                      {row.map((cell, ci) => (
-                        <td key={ci} className="p-1.5 px-2.5 border-b border-border/30 text-foreground text-[12px]">
-                          {cell}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 text-[10px] text-muted-foreground">
-              <span>Rows 1-{data.length - 1}</span>
-              <button type="button"
-                onClick={() => { toast.info("Download started"); }}
-                className="text-primary hover:underline"
-              >
-                Open Full ↗️
-              </button>
-            </div>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+            <img src={previewUrl} alt={file.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
           </div>
         );
       }
-
-      default:
-        return (
-          <div className="flex flex-col items-center justify-center gap-3 py-10 w-full">
-            <span className="text-6xl">{icon.emoji}</span>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">.{file.extension || file.name.split(".").pop()}</span>
-            <p className="text-sm text-muted-foreground">Preview not available for this file type.</p>
-            <button type="button"
-              onClick={() => toast.info("Download started")}
-              className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors mt-1"
-            >
-              <Download className="w-3.5 h-3.5" /> Download to view
-            </button>
-          </div>
-        );
+      return <Unavailable icon={icon.emoji} label={file.name} />;
     }
+
+    if (file.type === "pdf") {
+      if (previewUrl) {
+        return <iframe src={previewUrl} title={file.name} style={{ width: "100%", height: "100%", border: "none" }} />;
+      }
+      return <Unavailable icon="📄" label="PDF · preview unavailable" />;
+    }
+
+    if (file.type === "docx" || file.type === "xlsx" || file.type === "pptx") {
+      if (previewUrl) {
+        const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(previewUrl)}&embedded=true`;
+        return <iframe src={viewerUrl} title={file.name} style={{ width: "100%", height: "100%", border: "none" }} />;
+      }
+      return <Unavailable icon={icon.emoji} label={`${typeLabel} · preview unavailable`} />;
+    }
+
+    if (previewUrl && isVideo(file)) {
+      return (
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video src={previewUrl} controls style={{ maxWidth: "100%", maxHeight: "100%" }} />
+        </div>
+      );
+    }
+
+    if (previewUrl && isAudio(file)) {
+      return (
+        <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+          <span style={{ fontSize: 48 }}>🎵</span>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio src={previewUrl} controls style={{ width: "80%" }} />
+        </div>
+      );
+    }
+
+    if (textContent !== null) {
+      const ext = (file.extension || file.name.split(".").pop() || "").toLowerCase();
+      return (
+        <div style={{ width: "100%", height: "100%", overflow: "auto", padding: "12px 16px", boxSizing: "border-box" }}>
+          <div style={{ marginBottom: 8 }}>
+            <span style={monoLabel}>.{ext}</span>
+          </div>
+          <pre style={{ ...monoSm, color: "var(--text-secondary)", whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0, lineHeight: 1.6 }}>
+            {textContent}
+          </pre>
+        </div>
+      );
+    }
+
+    return <Unavailable icon={icon.emoji} label={`.${file.name.split(".").pop()} · preview unavailable`} />;
   };
 
-  /* ── Info Row ── */
-  const InfoRow = ({ label, value, clickable, onClick }: { label: string; value: React.ReactNode; clickable?: boolean; onClick?: () => void }) => (
-    <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-b-0">
-      <span className="text-xs text-muted-foreground font-medium min-w-[100px]">{label}</span>
+  /* ── Info row ── */
+  const InfoRow = ({
+    label, value, clickable, onClick,
+  }: { label: string; value: React.ReactNode; clickable?: boolean; onClick?: () => void }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid var(--sosa-border-dim)" }}>
+      <span style={{ ...monoLabel, fontSize: 9 }}>{label}</span>
       {clickable ? (
-        <button type="button" onClick={onClick} className="text-xs text-primary font-medium text-right hover:underline flex items-center gap-1">
+        <button type="button" onClick={onClick}
+          style={{ ...monoSm, background: "none", border: "none", cursor: "pointer", color: "var(--portal-accent)", fontWeight: 600 }}>
           {value}
         </button>
       ) : (
-        <span className="text-xs text-foreground font-medium text-right">{value}</span>
+        <span style={{ ...monoSm, color: "var(--text-primary)", fontWeight: 600 }}>{value}</span>
       )}
     </div>
   );
 
-  const drawerWidth = isMobile ? "100vw" : "480px";
-
+  /* ── Layout ── */
   return (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[45] bg-black/30 animate-in fade-in-0 duration-200"
         onClick={onClose}
+        style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.7)" }}
       />
 
-      {/* Drawer */}
-      <div
-        className="fixed top-0 right-0 z-[50] h-full flex flex-col bg-popover border-l border-border shadow-2xl animate-in slide-in-from-right duration-300"
-        style={{ width: drawerWidth, maxWidth: "100vw" }}
-      >
-        {/* Navigation arrows (prev/next) */}
-        {files.length > 1 && !isMobile && (
-          <div className="absolute -left-10 top-1/2 -translate-y-1/2 flex flex-col gap-1 z-10">
-            <button type="button"
-              onClick={goPrev}
-              disabled={currentIndex <= 0}
-              className="p-1.5 rounded-lg bg-popover border border-border shadow-md hover:bg-accent disabled:opacity-30 transition-colors"
-              aria-label="Previous file"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button type="button"
-              onClick={goNext}
-              disabled={currentIndex >= files.length - 1}
-              className="p-1.5 rounded-lg bg-popover border border-border shadow-md hover:bg-accent disabled:opacity-30 transition-colors"
-              aria-label="Next file"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+      {/* Modal */}
+      <div style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 201,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+        pointerEvents: "none",
+      }}>
+        <div style={{
+          pointerEvents: "all",
+          width: "100%",
+          maxWidth: 860,
+          maxHeight: "calc(100dvh - 48px)",
+          background: "var(--sosa-bg-2)",
+          border: "1px solid var(--sosa-border)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}>
 
-        {/* ZONE 1: Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <span className="text-2xl shrink-0">{icon.emoji}</span>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate max-w-[340px]">{file.name}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                {typeLabel} · {formatFileSize(file.size)} · {folderPath}
-              </p>
-            </div>
-          </div>
-          <button type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground shrink-0"
-            aria-label="Close preview"
-          >
-            {isMobile ? <ChevronLeft className="w-5 h-5" /> : <X className="w-5 h-5" />}
-          </button>
-        </div>
-
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">
-          {/* ZONE 2: Preview */}
-          <div className="px-5 py-4">
-            <div className="rounded-xl bg-muted/20 border border-border/50 p-4 flex items-center justify-center min-h-[180px]">
-              {renderPreview()}
-            </div>
-          </div>
-
-          {/* ZONE 3: Info Panel */}
-          <div className="px-5 py-4 border-t border-border">
-            {/* Editable Title */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Title</span>
-                {canWrite && !editingTitle && (
-                  <button type="button" onClick={() => setEditingTitle(true)} className="p-0.5 text-muted-foreground hover:text-foreground transition-colors">
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-              {editingTitle ? (
-                <input
-                  autoFocus
-                  value={titleValue}
-                  onChange={(e) => setTitleValue(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") saveTitle(); if (e.key === "Escape") { setEditingTitle(false); setTitleValue(file.name); } }}
-                  onBlur={saveTitle}
-                  className="w-full text-sm p-1.5 rounded-lg border border-input bg-background"
-                />
-              ) : (
-                <p className="text-sm text-foreground font-medium">{file.name}</p>
-              )}
-            </div>
-
-            {/* Editable Description */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Description</span>
-                {canWrite && !editingDesc && (
-                  <button type="button" onClick={() => setEditingDesc(true)} className="p-0.5 text-muted-foreground hover:text-foreground transition-colors">
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-              {editingDesc ? (
-                <div>
-                  <textarea
-                    autoFocus
-                    value={descValue}
-                    onChange={(e) => setDescValue(e.target.value.slice(0, 500))}
-                    onKeyDown={(e) => { if (e.key === "Escape") { setEditingDesc(false); setDescValue(file.description || ""); } }}
-                    className="w-full text-xs p-2 rounded-lg border border-input bg-background min-h-[60px] resize-none"
-                    placeholder="Add a description..."
-                  />
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-[10px] text-muted-foreground">{descValue.length}/500</span>
-                    <div className="flex gap-1.5">
-                      <button type="button" onClick={() => { setEditingDesc(false); setDescValue(file.description || ""); }} className="text-[11px] px-2 py-0.5 rounded border border-border hover:bg-accent">Cancel</button>
-                      <button type="button" onClick={saveDesc} className="text-[11px] px-2 py-0.5 rounded bg-primary text-primary-foreground hover:bg-primary/90">Save</button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  {file.description || (canWrite ? "Click edit to add a description..." : "No description")}
+          {/* ── Header ── */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 16px",
+            borderBottom: "1px solid var(--sosa-border)",
+            flexShrink: 0,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{icon.emoji}</span>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ ...monoMd, fontWeight: 700, color: "var(--text-primary)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 500 }}>
+                  {file.name}
                 </p>
-              )}
+                <p style={{ ...monoLabel, marginTop: 2 }}>
+                  {typeLabel} · {formatFileSize(file.size)} · {folderPath}
+                </p>
+              </div>
             </div>
 
-            {/* Metadata rows */}
-            <div className="flex flex-col">
-              <InfoRow label="Type" value={typeLabel} />
-              <InfoRow label="Size" value={formatFileSize(file.size)} />
-              {file.dimensions && (
-                <InfoRow label="Dimensions" value={`${file.dimensions.width} × ${file.dimensions.height} px`} />
-              )}
-              {file.pageCount && <InfoRow label="Pages" value={String(file.pageCount)} />}
-              {file.sheetNames && <InfoRow label="Sheets" value={file.sheetNames.join(", ")} />}
-              <InfoRow label="Uploaded" value={format(file.createdAt, "MMM d, yyyy")} />
-              <InfoRow
-                label="Uploaded by"
-                value={
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-4 h-4 rounded-full bg-primary/15 text-primary text-[8px] font-bold flex items-center justify-center shrink-0">
-                      {uploadedByName?.charAt(0) || "?"}
-                    </span>
-                    {uploadedByName || "Unknown"}
-                  </span>
-                }
-              />
-              <InfoRow label="Modified" value={format(file.modifiedAt, "MMM d, yyyy")} />
-              {modifiedByUser && (
-                <InfoRow
-                  label="Modified by"
-                  value={
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-primary/15 text-primary text-[8px] font-bold flex items-center justify-center shrink-0">
-                        {modifiedByUser.displayName.charAt(0)}
-                      </span>
-                      {modifiedByUser.displayName}
-                    </span>
-                  }
-                />
-              )}
-              <InfoRow
-                label="Location"
-                value={
-                  <span className="flex items-center gap-1">
-                    <FolderIcon className="w-3 h-3 text-primary" />
-                    {folderPath}
-                  </span>
-                }
-                clickable={file.folderId !== "trash"}
-                onClick={() => { onNavigateFolder(file.folderId); onClose(); }}
-              />
+            {files.length > 1 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 12 }}>
+                <button type="button" onClick={goPrev} disabled={currentIndex <= 0}
+                  style={{ ...monoSm, background: "none", border: "1px solid var(--sosa-border)", cursor: "pointer", padding: "3px 8px", color: "var(--text-tertiary)", opacity: currentIndex <= 0 ? 0.3 : 1 }}>
+                  <ChevronLeft style={{ width: 13, height: 13 }} />
+                </button>
+                <span style={{ ...monoLabel, fontSize: 9 }}>{currentIndex + 1} / {files.length}</span>
+                <button type="button" onClick={goNext} disabled={currentIndex >= files.length - 1}
+                  style={{ ...monoSm, background: "none", border: "1px solid var(--sosa-border)", cursor: "pointer", padding: "3px 8px", color: "var(--text-tertiary)", opacity: currentIndex >= files.length - 1 ? 0.3 : 1 }}>
+                  <ChevronRight style={{ width: 13, height: 13 }} />
+                </button>
+              </div>
+            )}
+
+            <button type="button" onClick={onClose}
+              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "1px solid var(--sosa-border)", cursor: "pointer", color: "var(--text-tertiary)", flexShrink: 0 }}>
+              <X style={{ width: 13, height: 13 }} />
+            </button>
+          </div>
+
+          {/* ── Body ── */}
+          <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
+
+            {/* LEFT — info */}
+            <div style={{
+              width: 260,
+              flexShrink: 0,
+              display: "flex",
+              flexDirection: "column",
+              borderRight: "1px solid var(--sosa-border)",
+              overflowY: "auto",
+            }}>
+              <div style={{ padding: "14px 16px", flex: 1 }}>
+
+                {/* Title */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={monoLabel}>Title</span>
+                    {canWrite && !editingTitle && (
+                      <button type="button" onClick={() => setEditingTitle(true)}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 0 }}>
+                        <Pencil style={{ width: 10, height: 10 }} />
+                      </button>
+                    )}
+                  </div>
+                  {editingTitle ? (
+                    <input autoFocus value={titleValue}
+                      onChange={(e) => setTitleValue(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveTitle(); if (e.key === "Escape") { setEditingTitle(false); setTitleValue(file.name); } }}
+                      onBlur={saveTitle}
+                      style={{ ...monoSm, width: "100%", padding: "5px 7px", background: "var(--sosa-bg-3)", border: "1px solid var(--sosa-border)", color: "var(--text-primary)", outline: "none", boxSizing: "border-box" }}
+                    />
+                  ) : (
+                    <p style={{ ...monoSm, fontWeight: 700, color: "var(--text-primary)", margin: 0, wordBreak: "break-word" }}>{file.name}</p>
+                  )}
+                </div>
+
+                {/* Description */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={monoLabel}>Description</span>
+                    {canWrite && !editingDesc && (
+                      <button type="button" onClick={() => setEditingDesc(true)}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)", padding: 0 }}>
+                        <Pencil style={{ width: 10, height: 10 }} />
+                      </button>
+                    )}
+                  </div>
+                  {editingDesc ? (
+                    <div>
+                      <textarea autoFocus value={descValue}
+                        onChange={(e) => setDescValue(e.target.value.slice(0, 500))}
+                        onKeyDown={(e) => { if (e.key === "Escape") { setEditingDesc(false); setDescValue(file.description || ""); } }}
+                        placeholder="Add a description..."
+                        style={{ ...monoSm, width: "100%", padding: "5px 7px", background: "var(--sosa-bg-3)", border: "1px solid var(--sosa-border)", color: "var(--text-primary)", outline: "none", minHeight: 56, resize: "none", boxSizing: "border-box" }}
+                      />
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                        <span style={{ ...monoLabel, fontSize: 9 }}>{descValue.length}/500</span>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <button type="button" onClick={() => { setEditingDesc(false); setDescValue(file.description || ""); }}
+                            style={{ ...monoSm, padding: "2px 8px", background: "none", border: "1px solid var(--sosa-border)", cursor: "pointer", color: "var(--text-tertiary)" }}>
+                            Cancel
+                          </button>
+                          <button type="button" onClick={saveDesc}
+                            style={{ ...monoSm, padding: "2px 8px", background: "var(--portal-accent)", border: "none", cursor: "pointer", color: "#000", fontWeight: 700 }}>
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ ...monoSm, color: "var(--text-tertiary)", margin: 0 }}>
+                      {file.description || (canWrite ? "Click edit to add a description..." : "No description")}
+                    </p>
+                  )}
+                </div>
+
+                {/* Metadata */}
+                <div style={{ borderTop: "1px solid var(--sosa-border)", paddingTop: 8 }}>
+                  <InfoRow label="Type" value={typeLabel} />
+                  <InfoRow label="Size" value={formatFileSize(file.size)} />
+                  {file.dimensions && (
+                    <InfoRow label="Dimensions" value={`${file.dimensions.width} × ${file.dimensions.height}`} />
+                  )}
+                  {file.pageCount ? <InfoRow label="Pages" value={String(file.pageCount)} /> : null}
+                  {file.sheetNames ? <InfoRow label="Sheets" value={file.sheetNames.join(", ")} /> : null}
+                  <InfoRow label="Uploaded" value={format(file.createdAt, "MMM d, yyyy")} />
+                  <InfoRow label="Uploaded by" value={uploaderName} />
+                  <InfoRow label="Modified" value={format(file.modifiedAt, "MMM d, yyyy")} />
+                  <InfoRow
+                    label="Location"
+                    value={folderPath}
+                    clickable={file.folderId !== "trash"}
+                    onClick={() => { onNavigateFolder(file.folderId); onClose(); }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT — preview */}
+            <div style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              background: "var(--sosa-bg-3)",
+              minWidth: 0,
+            }}>
+              <div style={{ padding: "6px 12px", borderBottom: "1px solid var(--sosa-border)", flexShrink: 0 }}>
+                <span style={monoLabel}>Preview</span>
+              </div>
+              <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
+                {renderPreview()}
+              </div>
             </div>
           </div>
+
+          {/* ── Actions footer ── */}
+          {!file.isDeleted && (
+            <div style={{ display: "flex", gap: 1, borderTop: "1px solid var(--sosa-border)", flexShrink: 0 }}>
+              <button type="button" onClick={() => { void onDownload(file.id); }}
+                style={{ ...monoSm, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px 0", background: "var(--color-success)", color: "#000", border: "none", cursor: "pointer", fontWeight: 700 }}>
+                <Download style={{ width: 12, height: 12 }} /> Download
+              </button>
+              {canWrite && (
+                <button type="button" onClick={() => setEditingTitle(true)}
+                  style={{ ...monoSm, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px 0", background: "none", color: "var(--text-secondary)", border: "none", borderLeft: "1px solid var(--sosa-border)", cursor: "pointer" }}>
+                  <Pencil style={{ width: 12, height: 12 }} /> Rename
+                </button>
+              )}
+              {canWrite && (
+                <button type="button" onClick={() => { onMoveFile(file); onClose(); }}
+                  style={{ ...monoSm, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px 0", background: "none", color: "var(--text-secondary)", border: "none", borderLeft: "1px solid var(--sosa-border)", cursor: "pointer" }}>
+                  <Move style={{ width: 12, height: 12 }} /> Move
+                </button>
+              )}
+              {isOwner && !confirmDelete && (
+                <button type="button" onClick={() => setConfirmDelete(true)}
+                  style={{ ...monoSm, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px 0", background: "rgba(255,45,85,0.07)", color: "var(--color-error)", border: "none", borderLeft: "1px solid var(--sosa-border)", cursor: "pointer" }}>
+                  <Trash2 style={{ width: 12, height: 12 }} /> Trash
+                </button>
+              )}
+              {isOwner && confirmDelete && (
+                <>
+                  <button type="button" onClick={() => setConfirmDelete(false)}
+                    style={{ ...monoSm, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "11px 0", background: "none", color: "var(--text-tertiary)", border: "none", borderLeft: "1px solid var(--sosa-border)", cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                  <button type="button" onClick={() => { onMoveToTrash(file.id); onClose(); }}
+                    style={{ ...monoSm, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px 0", background: "var(--color-error)", color: "#fff", border: "none", borderLeft: "1px solid var(--sosa-border)", cursor: "pointer", fontWeight: 700 }}>
+                    <Trash2 style={{ width: 12, height: 12 }} /> Confirm delete
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
-
-        {/* ZONE 4: Actions Bar */}
-        {!file.isDeleted && (
-          <div className="px-5 py-4 border-t border-border shrink-0 flex flex-wrap gap-2">
-            {permission && (
-              <button type="button"
-                onClick={() => toast.info("Download started")}
-                className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2.5 rounded-xl border border-border bg-background hover:bg-accent transition-colors text-foreground"
-              >
-                <Download className="w-3.5 h-3.5" /> Download
-              </button>
-            )}
-            {canWrite && (
-              <button type="button"
-                onClick={() => setEditingTitle(true)}
-                className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2.5 rounded-xl border border-border bg-background hover:bg-accent transition-colors text-foreground"
-              >
-                <Pencil className="w-3.5 h-3.5" /> Rename
-              </button>
-            )}
-            {canWrite && (
-              <button type="button"
-                onClick={() => onMoveFile(file)}
-                className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2.5 rounded-xl border border-border bg-background hover:bg-accent transition-colors text-foreground"
-              >
-                <Move className="w-3.5 h-3.5" /> Move
-              </button>
-            )}
-            {canWrite && (
-              <button type="button"
-                onClick={() => { onMoveToTrash(file.id); onClose(); }}
-                className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2.5 rounded-xl border border-border bg-background hover:bg-destructive/10 transition-colors text-destructive"
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Trash
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </>
   );
