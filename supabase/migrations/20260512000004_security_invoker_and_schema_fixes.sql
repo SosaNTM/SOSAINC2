@@ -8,9 +8,14 @@
 -- Trigger functions (add_owner_as_member, etc.) only fire from DB triggers —
 -- they never need to run as the table owner. SECURITY INVOKER is safe here.
 --
--- Portal ID lookup helpers (get_my_portal_ids, get_my_admin_portal_ids) use
--- auth.uid() inside — anon would get an empty result anyway, but switching to
--- SECURITY INVOKER + search_path = '' removes them from the anon attack surface.
+-- Trigger functions (add_owner_as_member, etc.) → SECURITY INVOKER safe: only
+-- called by DB triggers, never need owner privileges.
+--
+-- get_my_portal_ids / get_my_admin_portal_ids MUST stay SECURITY DEFINER:
+-- they are called inside RLS policies on portal_members and portals.
+-- SECURITY INVOKER would make them subject to those same RLS policies
+-- → infinite recursion → empty result → users can't see their portals.
+-- anon risk is minimal: auth.uid() returns null, so result is always empty array.
 
 ALTER FUNCTION public.add_owner_as_member() SECURITY INVOKER SET search_path = '';
 ALTER FUNCTION public.create_default_portal_settings() SECURITY INVOKER SET search_path = '';
@@ -18,8 +23,8 @@ ALTER FUNCTION public.handle_new_portal_seed() SECURITY INVOKER SET search_path 
 ALTER FUNCTION public.handle_new_user_portals() SECURITY INVOKER SET search_path = '';
 ALTER FUNCTION public.seed_portal_defaults(uuid) SECURITY INVOKER SET search_path = '';
 ALTER FUNCTION public.reset_portal_data(uuid) SECURITY INVOKER SET search_path = '';
-ALTER FUNCTION public.get_my_portal_ids() SECURITY INVOKER SET search_path = '';
-ALTER FUNCTION public.get_my_admin_portal_ids() SECURITY INVOKER SET search_path = '';
+ALTER FUNCTION public.get_my_portal_ids() SECURITY DEFINER SET search_path = '';
+ALTER FUNCTION public.get_my_admin_portal_ids() SECURITY DEFINER SET search_path = '';
 ALTER FUNCTION public.get_user_id_by_email(text) SECURITY INVOKER SET search_path = '';
 
 -- Fix B: Add receipt_url column to personal_transactions
