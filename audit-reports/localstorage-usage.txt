@@ -1,0 +1,61 @@
+src/App.tsx:72:if (typeof localStorage !== "undefined" && localStorage.getItem(STORAGE_APP_RESET_VERSION) !== RESET_VERSION) {
+src/App.tsx:76:      localStorage.removeItem(key);
+src/App.tsx:79:  localStorage.setItem(STORAGE_APP_RESET_VERSION, RESET_VERSION);
+src/components/AppHeader.tsx:58:    const stored = localStorage.getItem(STORAGE_AVATAR_PREFIX + user.id);
+src/components/AppHeader.tsx:64:      const stored = localStorage.getItem(STORAGE_AVATAR_PREFIX + user?.id);
+src/components/SidebarProfileWidget.tsx:29:    const stored = localStorage.getItem(STORAGE_AVATAR_PREFIX + user?.id);
+src/components/SidebarProfileWidget.tsx:36:      const stored = localStorage.getItem(STORAGE_AVATAR_PREFIX + user?.id);
+src/hooks/settings/index.ts:47:    const raw = localStorage.getItem(singletonSwrKey(table, portalId));
+src/hooks/settings/index.ts:54:  try { localStorage.setItem(singletonSwrKey(table, portalId), JSON.stringify(row)); } catch { /* quota exceeded */ }
+src/hooks/usePortalData.ts:17:    const raw = localStorage.getItem(swrKey(table, portalId));
+src/hooks/usePortalData.ts:24:  try { localStorage.setItem(swrKey(table, portalId), JSON.stringify(rows)); } catch { /* quota exceeded */ }
+src/i18n/index.ts:19:const savedLang = localStorage.getItem("SOSA INC_language") || "it";
+src/i18n/index.ts:41:  const stored = localStorage.getItem("SOSA INC_language");
+src/i18n/index.ts:47:  localStorage.setItem("SOSA INC_language", lang);
+src/lib/accent.tsx:35:    const saved = localStorage.getItem(STORAGE_ACCENT);
+src/lib/accent.tsx:41:    localStorage.setItem(STORAGE_ACCENT, accent);
+src/lib/authContext.tsx:125:    const data = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
+src/lib/authContext.tsx:148:        localStorage.removeItem(STORAGE_KEY);
+src/lib/authContext.tsx:204:    const raw = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
+src/lib/authContext.tsx:215:    localStorage.removeItem(STORAGE_KEY);
+src/lib/authContext.tsx:236:      localStorage.getItem(`${STORAGE_LAST_LOGIN_PREFIX}${userId}`) ||
+src/lib/numberFormat.tsx:26:    const saved = localStorage.getItem(STORAGE_NUMBER_FORMAT);
+src/lib/numberFormat.tsx:31:    const saved = localStorage.getItem(STORAGE_CURRENCY);
+src/lib/numberFormat.tsx:36:    localStorage.setItem(STORAGE_NUMBER_FORMAT, format);
+src/lib/numberFormat.tsx:40:    localStorage.setItem(STORAGE_CURRENCY, currency);
+src/lib/periodContext.tsx:24:    const saved = localStorage.getItem(STORAGE_DASHBOARD_PERIOD);
+src/lib/periodContext.tsx:30:      const saved = localStorage.getItem(STORAGE_DASHBOARD_CUSTOM_RANGE);
+src/lib/periodContext.tsx:38:    localStorage.setItem(STORAGE_DASHBOARD_PERIOD, period);
+src/lib/periodContext.tsx:42:    localStorage.setItem(STORAGE_DASHBOARD_CUSTOM_RANGE, JSON.stringify(customRange));
+src/lib/portalContext.tsx:66:      localStorage.setItem(`${STORAGE_PORTAL_LAST_ACCESSED_PREFIX}${portal.id}`, new Date().toISOString());
+src/lib/portalContext.tsx:90:  return localStorage.getItem(`${STORAGE_PORTAL_LAST_ACCESSED_PREFIX}${portalId}`);
+src/lib/profileStore.ts:130:    const stored = localStorage.getItem(key);
+src/lib/profileStore.ts:137:  localStorage.setItem(key, JSON.stringify(profile));
+src/lib/profileStore.ts:145:    current = JSON.parse(localStorage.getItem(key) || "{}");
+src/lib/profileStore.ts:150:  localStorage.setItem(key, JSON.stringify(updated));
+src/lib/theme.tsx:16:  localStorage.setItem(STORAGE_THEME, theme);
+src/lib/theme.tsx:21:    const stored = localStorage.getItem(STORAGE_THEME) as Theme | null;
+src/pages/cloud/cloud.types.tsx:42:  const timed = localStorage.getItem(
+src/pages/cloud/cloud.types.tsx:49:      localStorage.removeItem(`${STORAGE_CLOUD_UNLOCK_TIMED_PREFIX}${folderId}`);
+src/pages/cloud/cloud.types.tsx:66:    localStorage.setItem(
+src/pages/cloud/cloud.types.tsx:75:  localStorage.removeItem(`${STORAGE_CLOUD_UNLOCK_TIMED_PREFIX}${folderId}`);
+src/pages/cloud/CloudPage.tsx:510:      const saved = localStorage.getItem(STORAGE_CLOUD_FOLDERS);
+src/pages/cloud/CloudPage.tsx:522:    } catch { localStorage.removeItem(STORAGE_CLOUD_FOLDERS); }
+src/pages/cloud/CloudPage.tsx:530:      const saved = localStorage.getItem(STORAGE_CLOUD_SECTIONS);
+src/pages/cloud/CloudPage.tsx:535:    } catch { localStorage.removeItem(STORAGE_CLOUD_SECTIONS); }
+src/pages/cloud/CloudPage.tsx:567:    const saved = localStorage.getItem(STORAGE_CLOUD_COLLAPSED_SECTIONS);
+src/pages/cloud/CloudPage.tsx:605:  useEffect(() => { localStorage.setItem(STORAGE_CLOUD_FOLDERS, JSON.stringify(folders)); }, [folders]);
+src/pages/cloud/CloudPage.tsx:606:  useEffect(() => { localStorage.setItem(STORAGE_CLOUD_SECTIONS, JSON.stringify(sections)); }, [sections]);
+src/pages/cloud/CloudPage.tsx:724:      localStorage.setItem(STORAGE_CLOUD_COLLAPSED_SECTIONS, JSON.stringify([...next]));
+src/pages/leadgen/LeadgenSearch.tsx:131:  try { return JSON.parse(localStorage.getItem(FAV_KEY) ?? "[]"); } catch { return []; }
+src/pages/leadgen/LeadgenSearch.tsx:134:  localStorage.setItem(FAV_KEY, JSON.stringify(favs));
+src/pages/NotesPage.tsx:76:      const saved = localStorage.getItem(notesKey(currentPortalId, user.id));
+src/pages/NotesPage.tsx:87:      const saved = localStorage.getItem(noteFoldersKey(currentPortalId, user.id));
+src/pages/NotesPage.tsx:98:    if (currentPortalId && user?.id) localStorage.setItem(notesKey(currentPortalId, user.id), JSON.stringify(notes));
+src/pages/NotesPage.tsx:101:    if (currentPortalId && user?.id) localStorage.setItem(noteFoldersKey(currentPortalId, user.id), JSON.stringify(folders));
+src/pages/ProfilePage.tsx:62:    const stored = localStorage.getItem(STORAGE_AVATAR_PREFIX + profileUser?.id);
+src/pages/ProfilePage.tsx:64:    const storedBanner = localStorage.getItem(STORAGE_BANNER_PREFIX + profileUser?.id);
+src/pages/ProfilePage.tsx:96:        localStorage.setItem(STORAGE_AVATAR_PREFIX + profileUser.id, result.url);
+src/pages/ProfilePage.tsx:117:        localStorage.setItem(STORAGE_BANNER_PREFIX + profileUser.id, result.url);
+src/portals/finance/hooks/useCryptoPrices.ts:16:    const raw = localStorage.getItem(cacheKey(portalId));
+src/portals/finance/hooks/useCryptoPrices.ts:22:  try { localStorage.setItem(cacheKey(portalId), JSON.stringify(data)); } catch { }

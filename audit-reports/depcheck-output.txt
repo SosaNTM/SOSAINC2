@@ -1,0 +1,11 @@
+Unused dependencies
+* @hookform/resolvers
+Unused devDependencies
+* @playwright/test
+* @tailwindcss/typography
+* @testing-library/react
+* autoprefixer
+* postcss
+Missing dependencies
+* npm:@aws-sdk: .\supabase\functions\cloud-presign\index.ts
+* virtual:pwa-register: .\src\components\PWAUpdatePrompt.tsx

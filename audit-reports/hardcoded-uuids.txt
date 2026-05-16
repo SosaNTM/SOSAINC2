@@ -1,0 +1,4 @@
+src/lib/portalUUID.ts:7:  sosa: "00000000-0000-0000-0000-000000000001",
+src/lib/portalUUID.ts:8:  keylo: "00000000-0000-0000-0000-000000000002",
+src/lib/portalUUID.ts:9:  redx: "00000000-0000-0000-0000-000000000003",
+src/lib/portalUUID.ts:10:  trustme: "00000000-0000-0000-0000-000000000004",

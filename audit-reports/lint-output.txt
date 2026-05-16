@@ -1,0 +1,321 @@
+
+> vite_react_shadcn_ts@0.0.0 lint
+> eslint .
+
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\AppHeader.tsx
+   60:6  warning  React Hook useEffect has a missing dependency: 'user'. Either include it or remove the dependency array                                                                                      react-hooks/exhaustive-deps
+  100:9  warning  The 'handleSelect' function makes the dependencies of useEffect Hook (at line 134) change on every render. To fix this, wrap the definition of 'handleSelect' in its own useCallback() Hook  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\KpiDrillDown.tsx
+   20:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   25:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  160:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  211:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\MetricTooltip.tsx
+  13:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\NewGoalModal.tsx
+  107:6  warning  React Hook useEffect has a missing dependency: 'initialData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\NewTransactionModal.tsx
+  14:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  79:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  80:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\PLFormulaFlow.tsx
+   31:6  warning  React Hook useEffect has a missing dependency: 'display'. Either include it or remove the dependency array   react-hooks/exhaustive-deps
+  130:6  warning  React Hook useCallback has a missing dependency: 'blocks'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\PortalLayout.tsx
+  43:6  warning  React Hook useEffect has a missing dependency: 'portal'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\RevenueCostsDrillDown.tsx
+  54:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  63:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\SettingsModal.tsx
+  87:68  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\channels\AnalyticsTab.tsx
+   44:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  193:71  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\channels\ChannelsTab.tsx
+  236:16  error    Unexpected any. Specify a different type                                                                 @typescript-eslint/no-explicit-any
+  239:7   warning  React Hook useMemo has a missing dependency: 'months'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  248:16  error    Unexpected any. Specify a different type                                                                 @typescript-eslint/no-explicit-any
+  251:7   warning  React Hook useMemo has a missing dependency: 'months'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\cloud\FilePreviewDrawer.tsx
+  224:12  error  Definition for rule 'jsx-a11y/media-has-caption' was not found  jsx-a11y/media-has-caption
+  234:12  error  Definition for rule 'jsx-a11y/media-has-caption' was not found  jsx-a11y/media-has-caption
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\cloud\StorageOverview.tsx
+  193:7   error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  263:37  error  Unexpected any. Specify a different type                               @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\finance\AddTransactionModal.tsx
+  319:93  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\finance\CalendarHeatmap.tsx
+  115:76  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\finance\TransactionDrillDownModal.tsx
+  180:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\leadgen\LeadOutreachStatusBadge.tsx
+  40:10  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\leadgen\LeadTable.tsx
+  69:7  error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\linear\IssueDetailPanel.tsx
+  36:111  warning  React Hook useEffect has missing dependencies: 'issue.description' and 'issue.title'. Either include them or remove the dependency array. If 'setTitle' needs the current value of 'issue.title', you can also switch to useReducer instead of useState and read 'issue.title' in the reducer  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\linear\NewIssueModal.tsx
+  41:6  warning  React Hook useEffect has missing dependencies: 'handleCreate' and 'onClose'. Either include them or remove the dependency array. If 'onClose' changes too often, find the parent component that defines it and wrap that definition in useCallback  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\profile\EditProfileModal.tsx
+  326:59  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\profile\ProfileTasksTab.tsx
+  44:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\settings\SettingsTable.tsx
+  200:60  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\social\PostDetailModal.tsx
+  543:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\social\SocialAnalyticsDashboard.tsx
+  47:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  52:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\social\SocialAnalyticsModal.tsx
+   30:33  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  115:3   error  React Hook "useEffect" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks
+  242:28  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  321:28  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  395:75  error  Expected an assignment or function call and instead saw an expression                                                                                                                        @typescript-eslint/no-unused-expressions
+  427:28  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  488:8   error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  492:33  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  536:75  error  Expected an assignment or function call and instead saw an expression                                                                                                                        @typescript-eslint/no-unused-expressions
+  560:28  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  646:28  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  718:28  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\social\SocialAudienceModal.tsx
+  106:33  error  Unexpected any. Specify a different type                               @typescript-eslint/no-explicit-any
+  126:7   error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\social\SocialKpiModal.tsx
+  327:3   error  React Hook "useEffect" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks
+  465:28  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  500:28  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+  532:26  error  Unexpected any. Specify a different type                                                                                                                                                     @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\badge.tsx
+  29:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\button.tsx
+  47:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\command.tsx
+  24:11  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\form.tsx
+  129:10  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\navigation-menu.tsx
+  111:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\sidebar.tsx
+  636:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\sonner.tsx
+  27:19  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\textarea.tsx
+  5:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\toggle.tsx
+  37:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\components\ui\tree-view.tsx
+  111:8   warning  React Hook useEffect has a missing dependency: 'expandSpecificTargetedElements'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  263:6   warning  React Hook useCallback has a missing dependency: 'setExpandedItems'. Either include it or remove the dependency array              react-hooks/exhaustive-deps
+  265:62  warning  React Hook useCallback has a missing dependency: 'setExpandedItems'. Either include it or remove the dependency array              react-hooks/exhaustive-deps
+  269:6   warning  React Hook useEffect has missing dependencies: 'elements' and 'expendAllTree'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\hooks\useFinanceSummary.ts
+  146:6  warning  React Hook useCallback has an unnecessary dependency: 'tick'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\hooks\useInventory.ts
+  116:6  warning  React Hook useCallback has an unnecessary dependency: 'tick'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\hooks\usePortalData.ts
+  80:3  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\hooks\useTransactions.ts
+  106:6  warning  React Hook useCallback has an unnecessary dependency: 'tick'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\accent.tsx
+  12:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  53:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\authContext.tsx
+   13:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   29:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   57:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   61:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   71:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   75:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   83:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   88:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  227:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  233:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\financeCategoryStore.ts
+  66:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-unused-vars')
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\financeRealtime.ts
+  21:5  error  '_channel' is never reassigned. Use 'const' instead  prefer-const
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\leadgenRealtime.ts
+  12:5  error  '_channel' is never reassigned. Use 'const' instead  prefer-const
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\numberFormat.tsx
+  71:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\periodContext.tsx
+  55:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\portalContext.tsx
+  14:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  79:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  85:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  89:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\portalContextDB.tsx
+  140:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\profileStore.ts
+  132:11  error  Empty block statement  no-empty
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\tasksStore.ts
+  101:4  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-unused-vars')
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\lib\theme.tsx
+  43:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\AdministrationPage.tsx
+  412:108  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\Analytics.tsx
+  20:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  34:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\NotesPage.tsx
+   39:66  error  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+   79:31  error  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+   81:13  error  Empty block statement                                                      no-empty
+   90:31  error  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+   92:13  error  Empty block statement                                                      no-empty
+  236:7   error  Expected an assignment or function call and instead saw an expression      @typescript-eslint/no-unused-expressions
+  342:39  error  Unnecessary escape character: \[                                           no-useless-escape
+  486:15  error  Unexpected constant truthiness on the left-hand side of a `&&` expression  no-constant-binary-expression
+  858:33  error  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  899:33  error  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\ProfilePage.tsx
+  58:6  warning  React Hook useEffect has missing dependencies: 'isOwn' and 'profileUser'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\Recap.tsx
+    87:82   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+    95:24   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   104:38   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   461:136  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   975:50   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1083:55   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\TasksPage.tsx
+  121:6   warning  React Hook useCallback has a missing dependency: 'portalId'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  153:6   warning  React Hook useCallback has a missing dependency: 'portalId'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  172:6   warning  React Hook useCallback has a missing dependency: 'portalId'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  210:7   error    Expected an assignment or function call and instead saw an expression                                          @typescript-eslint/no-unused-expressions
+  344:83  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\cloud\CloudPage.tsx
+  180:39  error  React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render                                                                 react-hooks/rules-of-hooks
+  185:33  error  React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks
+  514:33  error  Unexpected any. Specify a different type                                                                                                                                                    @typescript-eslint/no-explicit-any
+  723:7   error  Expected an assignment or function call and instead saw an expression                                                                                                                       @typescript-eslint/no-unused-expressions
+  915:7   error  Expected an assignment or function call and instead saw an expression                                                                                                                       @typescript-eslint/no-unused-expressions
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\cloud\cloud.types.tsx
+  10:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  26:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  34:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  57:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  73:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\crypto\CryptoHoldingModal.tsx
+  94:6  warning  React Hook useEffect has a missing dependency: 'selectedCoin'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\crypto\CryptoPage.tsx
+  19:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-unused-vars')
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\gift-cards\GiftCardModal.tsx
+   10:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  364:98  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\gift-cards\GiftCardsPage.tsx
+  99:52  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\leadgen\LeadgenOverview.tsx
+  124:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\leadgen\LeadgenSettings.tsx
+  159:3  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+  164:6  warning  React Hook useEffect has missing dependencies: 'rules.length' and 'seedDefaults'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  169:6  warning  React Hook useEffect has a missing dependency: 'byType'. Either include it or remove the dependency array                             react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\settings\DangerZone.tsx
+   7:1   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+   9:31  error    Unexpected any. Specify a different type                                                               @typescript-eslint/no-explicit-any
+  47:40  error    Unexpected any. Specify a different type                                                               @typescript-eslint/no-explicit-any
+  76:34  error    Unexpected any. Specify a different type                                                               @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\settings\SettingsLayout.tsx
+  11:68  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\social\SocialAudience.tsx
+  100:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\social\SocialCompetitors.tsx
+  63:105  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\pages\social\SocialOverview.tsx
+  137:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  154:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  353:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  425:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\portals\finance\components\NewSubscriptionModal.tsx
+  173:6  warning  React Hook useEffect has missing dependencies: 'defaultCategory' and 'initialData'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\portals\finance\components\WaterfallChart.tsx
+  19:67  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\src\portals\finance\hooks\useCryptoPrices.ts
+  22:81  error  Empty block statement  no-empty
+
+C:\Users\hustl\Desktop\SOSA INC\SOSAINC2\tailwind.config.ts
+  115:13  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+✖ 159 problems (94 errors, 65 warnings)
+  2 errors and 6 warnings potentially fixable with the `--fix` option.
+
