@@ -8,6 +8,7 @@ import {
   type CloudFolder, type CloudFile, type PermissionLevel, type FolderSection,
 } from "@/lib/cloudStore";
 import { fetchFolders as svcFetchFolders, createFolder as svcCreateFolder, renameFolder as svcRenameFolder, softDeleteFolder as svcSoftDeleteFolder, updateFolderLock as svcUpdateFolderLock } from "@/lib/services/cloudService";
+import { sha256hex } from "@/hooks/settings";
 import { supabase as _cloudSupabase } from "@/lib/supabase";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const cloudSupabase = _cloudSupabase as any;
@@ -849,11 +850,14 @@ const CloudPage = () => {
   };
 
   // ── Unlock handler ──
-  const handleUnlock = () => {
+  const handleUnlock = async () => {
     if (!unlockPromptFolder || lockoutUntil) return;
     const folder = unlockPromptFolder;
-    const correctPassword = MOCK_FOLDER_PASSWORDS[folder.id] || folder.passwordHash;
-    if (unlockPassword === correctPassword) {
+    const inputHash = await sha256hex(unlockPassword);
+    // Support legacy plaintext in MOCK_FOLDER_PASSWORDS (in-memory session cache)
+    const correctHash = MOCK_FOLDER_PASSWORDS[folder.id] ?? folder.passwordHash;
+    const matches = correctHash != null && inputHash === correctHash;
+    if (matches) {
       setUnlockedFolders((prev) => new Set(prev).add(folder.id));
       setUnlockState(folder.id, unlockRemember, folder.lockAutoTimeoutMinutes || 30);
       setFolders((prev) =>
@@ -926,19 +930,20 @@ const CloudPage = () => {
   const handleSetPassword = async (folderId: string, password: string, timeoutMinutes: number) => {
     const folderName = folders.find((f) => f.id === folderId)?.name || folderId;
     const now = new Date().toISOString();
+    const hash = await sha256hex(password);
     const ok = await svcUpdateFolderLock(folderId, {
       is_locked: true,
-      password_hash: password,
+      password_hash: hash,
       lock_auto_timeout_minutes: timeoutMinutes,
       password_set_at: now,
     }, currentPortalId ?? undefined);
     if (!ok) { toast.error("Password non salvata — riprova"); return; }
-    MOCK_FOLDER_PASSWORDS[folderId] = password;
+    MOCK_FOLDER_PASSWORDS[folderId] = hash;
     setFolders((prev) =>
       prev.map((f) =>
         f.id === folderId
           ? {
-              ...f, isLocked: true, passwordHash: password, passwordSetBy: userId,
+              ...f, isLocked: true, passwordHash: hash, passwordSetBy: userId,
               passwordSetAt: new Date(now), lockAutoTimeoutMinutes: timeoutMinutes,
               failedAttempts: 0, lockedUntil: null,
             }
@@ -956,17 +961,18 @@ const CloudPage = () => {
   const handleChangePassword = async (folderId: string, newPassword: string) => {
     const folderName = folders.find((f) => f.id === folderId)?.name || folderId;
     const now = new Date().toISOString();
+    const hash = await sha256hex(newPassword);
     const ok = await svcUpdateFolderLock(folderId, {
       is_locked: true,
-      password_hash: newPassword,
+      password_hash: hash,
       password_set_at: now,
     }, currentPortalId ?? undefined);
     if (!ok) { toast.error("Password non aggiornata — riprova"); return; }
-    MOCK_FOLDER_PASSWORDS[folderId] = newPassword;
+    MOCK_FOLDER_PASSWORDS[folderId] = hash;
     setFolders((prev) =>
       prev.map((f) =>
         f.id === folderId
-          ? { ...f, passwordHash: newPassword, passwordSetBy: userId, passwordSetAt: new Date(now), failedAttempts: 0, lockedUntil: null }
+          ? { ...f, passwordHash: hash, passwordSetBy: userId, passwordSetAt: new Date(now), failedAttempts: 0, lockedUntil: null }
           : f
       )
     );
