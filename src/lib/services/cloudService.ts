@@ -152,6 +152,30 @@ export async function restoreFile(id: string, portalId: string): Promise<boolean
   }
 }
 
+// ─── Folder lock ─────────────────────────────────────────────────────────────
+
+export interface FolderLockUpdate {
+  is_locked: boolean;
+  password_hash: string | null;
+  lock_auto_timeout_minutes?: number;
+  password_set_at?: string | null;
+}
+
+export async function updateFolderLock(
+  id: string,
+  updates: FolderLockUpdate,
+  portalId?: string,
+): Promise<boolean> {
+  try {
+    let q = supabase.from("cloud_folders").update(updates).eq("id", id);
+    if (portalId) q = q.eq("portal_id", toPortalUUID(portalId));
+    const { error } = await q;
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchTrash(portalId: string): Promise<DbCloudFile[]> {
   try {
     const { data, error } = await supabase

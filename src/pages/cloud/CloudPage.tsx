@@ -7,7 +7,7 @@ import {
   getFileTypeIcon, formatFileSize, getUserPermission, getFolderPath,
   type CloudFolder, type CloudFile, type PermissionLevel, type FolderSection,
 } from "@/lib/cloudStore";
-import { fetchFolders as svcFetchFolders, createFolder as svcCreateFolder, renameFolder as svcRenameFolder, softDeleteFolder as svcSoftDeleteFolder } from "@/lib/services/cloudService";
+import { fetchFolders as svcFetchFolders, createFolder as svcCreateFolder, renameFolder as svcRenameFolder, softDeleteFolder as svcSoftDeleteFolder, updateFolderLock as svcUpdateFolderLock } from "@/lib/services/cloudService";
 import { supabase as _cloudSupabase } from "@/lib/supabase";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const cloudSupabase = _cloudSupabase as any;
@@ -923,51 +923,72 @@ const CloudPage = () => {
   };
 
   // ── Password management ──
-  const handleSetPassword = (folderId: string, password: string, timeoutMinutes: number) => {
-    MOCK_FOLDER_PASSWORDS[folderId] = password;
+  const handleSetPassword = async (folderId: string, password: string, timeoutMinutes: number) => {
     const folderName = folders.find((f) => f.id === folderId)?.name || folderId;
+    const now = new Date().toISOString();
+    const ok = await svcUpdateFolderLock(folderId, {
+      is_locked: true,
+      password_hash: password,
+      lock_auto_timeout_minutes: timeoutMinutes,
+      password_set_at: now,
+    }, currentPortalId ?? undefined);
+    if (!ok) { toast.error("Password non salvata — riprova"); return; }
+    MOCK_FOLDER_PASSWORDS[folderId] = password;
     setFolders((prev) =>
       prev.map((f) =>
         f.id === folderId
           ? {
               ...f, isLocked: true, passwordHash: password, passwordSetBy: userId,
-              passwordSetAt: new Date(), lockAutoTimeoutMinutes: timeoutMinutes,
+              passwordSetAt: new Date(now), lockAutoTimeoutMinutes: timeoutMinutes,
               failedAttempts: 0, lockedUntil: null,
             }
           : f
       )
     );
     setSetPasswordFolder(null);
-    toast.success("🔒 Password set");
+    toast.success("🔒 Password impostata");
     addAuditEntry({
       userId, action: `Set password on folder "${folderName}"`, category: "cloud",
       details: `Auto-lock timeout: ${timeoutMinutes} min`, icon: "🔐",
     });
   };
 
-  const handleChangePassword = (folderId: string, newPassword: string) => {
-    MOCK_FOLDER_PASSWORDS[folderId] = newPassword;
+  const handleChangePassword = async (folderId: string, newPassword: string) => {
     const folderName = folders.find((f) => f.id === folderId)?.name || folderId;
+    const now = new Date().toISOString();
+    const ok = await svcUpdateFolderLock(folderId, {
+      is_locked: true,
+      password_hash: newPassword,
+      password_set_at: now,
+    }, currentPortalId ?? undefined);
+    if (!ok) { toast.error("Password non aggiornata — riprova"); return; }
+    MOCK_FOLDER_PASSWORDS[folderId] = newPassword;
     setFolders((prev) =>
       prev.map((f) =>
         f.id === folderId
-          ? { ...f, passwordHash: newPassword, passwordSetBy: userId, passwordSetAt: new Date(), failedAttempts: 0, lockedUntil: null }
+          ? { ...f, passwordHash: newPassword, passwordSetBy: userId, passwordSetAt: new Date(now), failedAttempts: 0, lockedUntil: null }
           : f
       )
     );
     clearUnlockState(folderId);
     setUnlockedFolders((prev) => { const next = new Set(prev); next.delete(folderId); return next; });
     setChangePasswordFolder(null);
-    toast.success("🔒 Password changed — all sessions revoked");
+    toast.success("🔒 Password cambiata — tutte le sessioni revocate");
     addAuditEntry({
       userId, action: `Changed password on folder "${folderName}"`, category: "cloud",
       details: "All active sessions revoked", icon: "🔐",
     });
   };
 
-  const handleRemovePassword = (folderId: string) => {
-    delete MOCK_FOLDER_PASSWORDS[folderId];
+  const handleRemovePassword = async (folderId: string) => {
     const folderName = folders.find((f) => f.id === folderId)?.name || folderId;
+    const ok = await svcUpdateFolderLock(folderId, {
+      is_locked: false,
+      password_hash: null,
+      password_set_at: null,
+    }, currentPortalId ?? undefined);
+    if (!ok) { toast.error("Password non rimossa — riprova"); return; }
+    delete MOCK_FOLDER_PASSWORDS[folderId];
     setFolders((prev) =>
       prev.map((f) =>
         f.id === folderId
@@ -978,7 +999,7 @@ const CloudPage = () => {
     clearUnlockState(folderId);
     setUnlockedFolders((prev) => { const next = new Set(prev); next.delete(folderId); return next; });
     setRemovePasswordFolder(null);
-    toast.success("🔓 Password removed");
+    toast.success("🔓 Protezione rimossa");
     addAuditEntry({
       userId, action: `Removed password from folder "${folderName}"`, category: "cloud",
       details: "Folder is now unprotected", icon: "🔓",
