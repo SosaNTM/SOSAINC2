@@ -231,10 +231,21 @@ function CreateLoginModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const isValid = !submitting && name.trim() && email.trim() && password.length >= 6 && password === confirmPassword && portalAccess.length > 0;
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const isValid = !submitting && name.trim() && emailValid && password.length >= 6 && password === confirmPassword && portalAccess.length > 0;
+
+  const missingFields: string[] = [];
+  if (!name.trim())                  missingFields.push("Full name");
+  if (!email.trim())                 missingFields.push("Email");
+  else if (!emailValid)              missingFields.push("Valid email");
+  if (password.length < 6)           missingFields.push("Password (min 6 chars)");
+  if (password !== confirmPassword)  missingFields.push("Matching confirm password");
+  if (portalAccess.length === 0)     missingFields.push("At least one portal");
 
   async function handleCreate() {
     setError("");
+    if (!name.trim()) { setError("Full name is required."); return; }
+    if (!emailValid) { setError("Enter a valid email address."); return; }
     if (password !== confirmPassword) { setError("Passwords do not match."); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (portalAccess.length === 0) { setError("Select at least one portal."); return; }
@@ -346,10 +357,16 @@ function CreateLoginModal({ onClose, onCreated }: { onClose: () => void; onCreat
             <p style={{ fontSize: 12, color: "var(--color-error)", background: "rgba(239,68,68,0.08)", border: "0.5px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "8px 12px" }}>{error}</p>
           )}
 
+          {!error && missingFields.length > 0 && (
+            <p style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+              → Missing: {missingFields.join(", ")}
+            </p>
+          )}
+
           <div className="flex gap-2 justify-end pt-2">
             <button type="button" onClick={onClose} className="glass-btn" style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8 }}>Cancel</button>
-            <button type="button" onClick={() => void handleCreate()} disabled={!isValid} className="glass-btn-primary flex items-center gap-1.5"
-              style={{ fontSize: 13, padding: "8px 20px", borderRadius: 8, opacity: isValid ? 1 : 0.45 }}>
+            <button type="button" onClick={() => void handleCreate()} disabled={submitting} className="glass-btn-primary flex items-center gap-1.5"
+              style={{ fontSize: 13, padding: "8px 20px", borderRadius: 8, opacity: isValid ? 1 : 0.55, cursor: submitting ? "wait" : "pointer" }}>
               <UserPlus className="w-3.5 h-3.5" /> {submitting ? "Creating…" : "Create Login"}
             </button>
           </div>
