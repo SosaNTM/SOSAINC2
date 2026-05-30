@@ -56,14 +56,18 @@ function toCloudFile(row: CloudFileRow): CloudFile {
 async function callPresign(body: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { data, error } = await supabase.functions.invoke("cloud-presign", { body });
   if (error) {
-    const ctx = (error as { context?: Response }).context;
-    if (ctx) {
+    // error.context may be a Response (supabase-js v2) OR a plain object — guard before
+    // calling Response methods, else ".clone is not a function" masks the real error.
+    const ctx = (error as { context?: unknown }).context;
+    if (ctx instanceof Response) {
       try {
         const errBody = await ctx.clone().json();
-        throw new Error(errBody?.error ?? error.message);
-      } catch (parseErr) {
-        if (parseErr instanceof Error && parseErr.message !== error.message) throw parseErr;
+        if (errBody?.error) throw new Error(errBody.error);
+      } catch {
+        // body not JSON or already read — fall through to error.message
       }
+    } else if (ctx && typeof ctx === "object" && "error" in ctx) {
+      throw new Error(String((ctx as { error: unknown }).error));
     }
     throw new Error(error.message);
   }
