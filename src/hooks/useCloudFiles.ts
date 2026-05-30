@@ -112,12 +112,12 @@ export function useCloudFiles() {
       if (!currentPortalId) return;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-      const fileId = crypto.randomUUID();
       const mimeType = file.type || "application/octet-stream";
 
       // Proxy upload through the cloud-upload Edge Function. Browser->iDrive S3 direct
       // PUT is blocked by the bucket's missing CORS policy, so we stream bytes through
-      // our function (which holds the S3 credentials) instead.
+      // our function (which holds the S3 credentials) instead. The function generates
+      // the file id server-side (do not trust a client-supplied id).
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const res = await fetch(`${supabaseUrl}/functions/v1/cloud-upload`, {
         method: "POST",
@@ -125,7 +125,6 @@ export function useCloudFiles() {
           Authorization: `Bearer ${session.access_token}`,
           "Content-Type": "application/octet-stream",
           "x-portal-id": currentPortalId,
-          "x-file-id": fileId,
           "x-folder-id": folderId,
           "x-file-name": encodeURIComponent(file.name),
           "x-mime-type": mimeType,
