@@ -131,11 +131,18 @@ const Dashboard = () => {
   /* ── Business waterfall data (non-sosa portals) ───────────── */
   const waterfallMetrics = useMemo(() => {
     if (!isBusinessPortal) return null;
-    const classified = rawTransactions.filter((tx) => !!tx.cost_classification);
-    if (classified.length === 0) return null;
-    const revenue    = classified.filter((tx) => tx.cost_classification === "revenue").reduce((s, tx) => s + tx.amount, 0);
-    const cogs       = classified.filter((tx) => tx.cost_classification === "cogs").reduce((s, tx) => s + tx.amount, 0);
-    const opex       = classified.filter((tx) => tx.cost_classification === "opex").reduce((s, tx) => s + tx.amount, 0);
+    if (rawTransactions.length === 0) return null;
+    // Use cost_classification when present; otherwise fall back to type:
+    // income → revenue, expense → opex (so unclassified transactions still populate the P&L).
+    const classOf = (tx: typeof rawTransactions[number]): "revenue" | "cogs" | "opex" => {
+      if (tx.cost_classification === "revenue" || tx.cost_classification === "cogs" || tx.cost_classification === "opex") {
+        return tx.cost_classification;
+      }
+      return tx.type === "income" ? "revenue" : "opex";
+    };
+    const revenue    = rawTransactions.filter((tx) => classOf(tx) === "revenue").reduce((s, tx) => s + Math.abs(tx.amount), 0);
+    const cogs       = rawTransactions.filter((tx) => classOf(tx) === "cogs").reduce((s, tx) => s + Math.abs(tx.amount), 0);
+    const opex       = rawTransactions.filter((tx) => classOf(tx) === "opex").reduce((s, tx) => s + Math.abs(tx.amount), 0);
     const grossProfit = revenue - cogs;
     const ebitda      = grossProfit - opex;
     const grossMarginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;

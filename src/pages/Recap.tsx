@@ -828,7 +828,13 @@ export default function Recap() {
           onClick={() => openDrill("Tutte le transazioni", allTransactions, Math.abs(summary.netBalance))}
         />
         <KpiCard
-          label="Risparmio" value={`${savingsPct}%`}
+          label="Volume Totale" value={formatCurrency(summary.totalIncome + summary.totalExpenses)}
+          sub={`${summary.transactionCount} transazioni`}
+          color="var(--text-primary)" loading={loading}
+          onClick={() => openDrill("Tutte le transazioni", allTransactions, summary.totalIncome + summary.totalExpenses)}
+        />
+        <KpiCard
+          label="Profit" value={`${savingsPct}%`}
           sub={`${summary.transactionCount} transazioni`}
           color={savingsPct >= 20 ? "var(--color-success)" : savingsPct >= 0 ? "var(--color-warning)" : "var(--color-error)"}
           loading={loading}
