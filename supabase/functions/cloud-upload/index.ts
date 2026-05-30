@@ -53,13 +53,15 @@ serve(async (req: Request) => {
 
   try {
     const portalId = req.headers.get("x-portal-id") ?? "";
-    const fileId = req.headers.get("x-file-id") ?? "";
     const folderId = req.headers.get("x-folder-id") ?? "";
     const rawName = req.headers.get("x-file-name") ?? "";
     const fileName = rawName ? decodeURIComponent(rawName) : "";
     const mimeType = req.headers.get("x-mime-type") || "application/octet-stream";
+    // fileId is generated server-side — never trust client (prevents overwriting
+    // arbitrary existing S3 objects / cloud_files rows by ID collision).
+    const fileId = crypto.randomUUID();
 
-    if (!portalId || !fileId || !fileName) return json({ error: "Missing file metadata headers" }, 400);
+    if (!portalId || !fileName) return json({ error: "Missing file metadata headers" }, 400);
 
     const supabaseAnon = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -78,6 +80,15 @@ serve(async (req: Request) => {
       .from("portal_members").select("role")
       .eq("portal_id", portalId).eq("user_id", user.id).maybeSingle();
     if (!member) return json({ error: "Not a portal member" }, 403);
+
+    // Validate folder belongs to this portal (prevents IDOR: writing a file into
+    // another portal's folder by passing its folder_id).
+    if (folderId) {
+      const { data: folder } = await supabase
+        .from("cloud_folders").select("id")
+        .eq("id", folderId).eq("portal_id", portalId).maybeSingle();
+      if (!folder) return json({ error: "Invalid folder" }, 400);
+    }
 
     const bytes = new Uint8Array(await req.arrayBuffer());
     if (bytes.length === 0) return json({ error: "Empty file body" }, 400);
