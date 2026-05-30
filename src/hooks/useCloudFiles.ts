@@ -110,33 +110,32 @@ export function useCloudFiles() {
   const upload = useCallback(
     async (file: File, folderId: string): Promise<void> => {
       if (!currentPortalId) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
       const fileId = crypto.randomUUID();
-      const { url, s3_key } = await callPresign({
-        operation: "upload",
-        portal_id: currentPortalId,
-        file_id: fileId,
-        file_name: file.name,
-        mime_type: file.type || "application/octet-stream",
-      });
-      const putRes = await fetch(url as string, {
-        method: "PUT",
+      const mimeType = file.type || "application/octet-stream";
+
+      // Proxy upload through the cloud-upload Edge Function. Browser->iDrive S3 direct
+      // PUT is blocked by the bucket's missing CORS policy, so we stream bytes through
+      // our function (which holds the S3 credentials) instead.
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const res = await fetch(`${supabaseUrl}/functions/v1/cloud-upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/octet-stream",
+          "x-portal-id": currentPortalId,
+          "x-file-id": fileId,
+          "x-folder-id": folderId,
+          "x-file-name": encodeURIComponent(file.name),
+          "x-mime-type": mimeType,
+        },
         body: file,
-        headers: { "Content-Type": file.type || "application/octet-stream" },
       });
-      if (!putRes.ok) throw new Error(`Upload to storage failed: ${putRes.status}`);
-      const { error } = await supabase.from("cloud_files").insert({
-        id: fileId,
-        portal_id: currentPortalId,
-        folder_id: folderId,
-        name: file.name,
-        size: file.size,
-        mime_type: file.type || "application/octet-stream",
-        s3_key,
-        uploaded_by: user.id,
-      });
-      if (error) throw new Error(error.message);
+      const text = await res.text();
+      let parsed: { error?: string } = {};
+      try { parsed = text ? JSON.parse(text) as { error?: string } : {}; } catch { /* non-JSON */ }
+      if (!res.ok) throw new Error(parsed.error ?? `Upload failed (HTTP ${res.status})`);
       await fetchAll();
     },
     [currentPortalId, fetchAll]
