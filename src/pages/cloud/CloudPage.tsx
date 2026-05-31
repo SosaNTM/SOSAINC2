@@ -4,7 +4,7 @@ import { usePortalUsers } from "@/hooks/usePortalUsers";
 import { STORAGE_CLOUD_COLLAPSED_SECTIONS } from "@/constants/storageKeys";
 import {
   INITIAL_FOLDERS, INITIAL_SECTIONS,
-  TOTAL_STORAGE_GB, USED_STORAGE_GB, MOCK_FOLDER_PASSWORDS,
+  TOTAL_STORAGE_GB, MOCK_FOLDER_PASSWORDS,
   getFileTypeIcon, formatFileSize, getUserPermission, getFolderPath,
   type CloudFolder, type CloudFile, type PermissionLevel, type FolderSection,
 } from "@/lib/cloudStore";
@@ -749,6 +749,13 @@ const CloudPage = () => {
     () => files.filter((f) => f.isDeleted).reduce((s, f) => s + f.size, 0),
     [files]
   );
+  // Real storage usage: sum of all non-trashed file sizes (bytes) vs 1 TB quota.
+  const usedStorageBytes = useMemo(
+    () => files.filter((f) => !f.isDeleted).reduce((s, f) => s + f.size, 0),
+    [files]
+  );
+  const storageQuotaBytes = TOTAL_STORAGE_GB * 1024 * 1024 * 1024;
+  const storagePct = Math.min(100, (usedStorageBytes / storageQuotaBytes) * 100);
 
   const currentFiles = useMemo(() => {
     if (showTrash) return files.filter((f) => f.isDeleted);
@@ -1550,11 +1557,11 @@ const CloudPage = () => {
             Storage
           </span>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--sosa-white-40)" }}>
-            {USED_STORAGE_GB} / {TOTAL_STORAGE_GB} GB
+            {formatFileSize(usedStorageBytes)} / 1 TB
           </span>
         </div>
         <div style={{ height: 2, background: "var(--sosa-border)", position: "relative" }}>
-          <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${(USED_STORAGE_GB / TOTAL_STORAGE_GB) * 100}%`, background: "var(--portal-accent)" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${storagePct}%`, background: "var(--portal-accent)" }} />
         </div>
       </button>
     </div>

@@ -80,8 +80,8 @@ export const INITIAL_FILES: CloudFile[] = [];
 
 export const INITIAL_SECTIONS: FolderSection[] = [];
 
-export const TOTAL_STORAGE_GB = 10;
-export const USED_STORAGE_GB = 4.2;
+export const TOTAL_STORAGE_GB = 1024; // 1 TB
+export const USED_STORAGE_GB = 0; // deprecated — used storage is now computed from real file sizes
 
 export function getFileTypeIcon(type: CloudFile["type"]): { emoji: string; color: string } {
   switch (type) {
