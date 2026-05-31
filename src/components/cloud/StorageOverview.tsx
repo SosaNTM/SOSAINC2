@@ -311,7 +311,7 @@ export default function StorageOverview({
             <span style={{ ...monoXs, fontWeight: 700, color: "var(--text-primary)" }}>Storage Overview</span>
           </div>
           <span style={{ ...monoSm, color: "var(--text-tertiary)" }}>
-            {formatFileSize(totalUsed)} / {TOTAL_STORAGE_GB} GB
+            {formatFileSize(totalUsed)} / 1 TB
           </span>
         </div>
         <div style={{ height: 2, background: "var(--sosa-border)", position: "relative" }}>
