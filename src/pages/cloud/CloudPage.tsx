@@ -633,8 +633,11 @@ const CloudPage = () => {
       const currentIds = new Set(folders.map((f) => f.id));
       const lastIds = new Set(lastSyncedFoldersRef.current.keys());
 
-      // Upsert new + modified
+      // Upsert new + modified. Skip folders with non-UUID ids (legacy "f_<ts>")
+      // or when we have no authenticated user (created_by is NOT NULL + RLS).
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       for (const f of folders) {
+        if (!user?.id || !UUID_RE.test(f.id)) continue;
         const serialized = JSON.stringify(f);
         if (lastSyncedFoldersRef.current.get(f.id) !== serialized) {
           await cloudSupabase
@@ -643,7 +646,7 @@ const CloudPage = () => {
               id: f.id,
               portal_id: toPortalUUIDCloud(currentPortalId),
               name: f.name,
-              parent_id: f.parentId,
+              parent_id: f.parentId && UUID_RE.test(f.parentId) ? f.parentId : null,
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               permissions: f.permissions as any,
               is_locked: f.isLocked ?? false,
@@ -1034,7 +1037,9 @@ const CloudPage = () => {
 
   const createFolder = () => {
     if (!newFolderName?.trim()) return;
-    const id = `f_${Date.now()}`;
+    // Must be a real UUID — cloud_folders.id and cloud_files.folder_id are uuid
+    // columns, so a "f_<timestamp>" id would 400 on sync and break file linking.
+    const id = crypto.randomUUID();
     const parentPerms = currentFolderId
       ? folders.find((f) => f.id === currentFolderId)?.permissions || []
       : [];

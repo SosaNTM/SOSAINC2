@@ -81,13 +81,17 @@ serve(async (req: Request) => {
       .eq("portal_id", portalId).eq("user_id", user.id).maybeSingle();
     if (!member) return json({ error: "Not a portal member" }, 403);
 
-    // Validate folder belongs to this portal (prevents IDOR: writing a file into
-    // another portal's folder by passing its folder_id).
+    // Resolve folder: only attach folder_id if it's a real cloud_folders row in
+    // THIS portal. Client-only/unsynced folders or another portal's folder → null
+    // (file stored ungrouped). portal_id on the file is the real isolation boundary.
+    let resolvedFolderId: string | null = null;
     if (folderId) {
       const { data: folder } = await supabase
-        .from("cloud_folders").select("id")
-        .eq("id", folderId).eq("portal_id", portalId).maybeSingle();
-      if (!folder) return json({ error: "Invalid folder" }, 400);
+        .from("cloud_folders").select("portal_id")
+        .eq("id", folderId).maybeSingle();
+      if (folder && folder.portal_id === portalId) {
+        resolvedFolderId = folderId;
+      }
     }
 
     const bytes = new Uint8Array(await req.arrayBuffer());
@@ -105,7 +109,7 @@ serve(async (req: Request) => {
     const { error: insErr } = await supabase.from("cloud_files").insert({
       id: fileId,
       portal_id: portalId,
-      folder_id: folderId || null,
+      folder_id: resolvedFolderId,
       name: fileName,
       size: bytes.length,
       mime_type: mimeType,
