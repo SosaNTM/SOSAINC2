@@ -1216,14 +1216,35 @@ const CloudPage = () => {
 
   const handleRealUpload = async (actualFiles: File[], folderId: string) => {
     let successCount = 0;
+    let resolvedFolderId: string | null = null;
     const folderName = folders.find((f) => f.id === folderId)?.name || folderId;
     for (const file of actualFiles) {
       try {
-        await cloudFiles.upload(file, folderId, folderName);
+        const fid = await cloudFiles.upload(file, folderId, folderName);
+        if (fid) resolvedFolderId = fid;
         successCount++;
       } catch (err) {
         toast.error(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : "Unknown error"}`);
       }
+    }
+    // The Edge Function may have created/resolved a real DB folder (UUID) for a
+    // legacy client folder id. Reload folders from DB and navigate to it so the
+    // freshly uploaded files are visible (UI filters files by the active folder id).
+    if (resolvedFolderId && currentPortalId) {
+      try {
+        const dbFolders = await svcFetchFolders(currentPortalId);
+        const mapped: CloudFolder[] = dbFolders.map((r: DbCloudFolder) => ({
+          id: r.id, name: r.name, parentId: r.parent_id,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          permissions: (r as any).permissions ?? [], inheritPermissions: true,
+          createdAt: new Date(r.created_at ?? Date.now()), isDeleted: r.is_deleted ?? false,
+          isLocked: r.is_locked ?? false, passwordHash: r.password_hash ?? null,
+          passwordSetBy: null, passwordSetAt: r.password_set_at ? new Date(r.password_set_at) : null,
+          lockAutoTimeoutMinutes: r.lock_auto_timeout_minutes ?? 10, failedAttempts: 0, lockedUntil: null,
+        }));
+        if (mapped.length > 0) setFolders(mapped);
+        if (resolvedFolderId !== folderId) setCurrentFolderId(resolvedFolderId);
+      } catch { /* non-fatal: files are saved regardless */ }
     }
     setShowUploadModal(false);
     if (successCount > 0) {

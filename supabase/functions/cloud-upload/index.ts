@@ -83,10 +83,11 @@ serve(async (req: Request) => {
       .eq("portal_id", portalId).eq("user_id", user.id).maybeSingle();
     if (!member) return json({ error: "Not a portal member" }, 403);
 
-    // Resolve folder. If x-folder-id is a UUID, ensure the cloud_folders row exists
-    // (create it on the fly from x-folder-name) so files always link to their folder —
-    // removes the client-side debounced-sync race. Non-UUID/legacy ids → null
-    // (file stored ungrouped). portal_id on the file is the real isolation boundary.
+    // Resolve folder so files always link, regardless of the client folder id format:
+    //  - UUID id  → ensure the cloud_folders row exists (create on the fly if missing)
+    //  - non-UUID id (legacy "f_<ts>") but a folder name → find the folder by
+    //    (portal, name) or create a fresh UUID folder with that name
+    // portal_id on the file remains the real isolation boundary.
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let resolvedFolderId: string | null = null;
     if (folderId && UUID_RE.test(folderId)) {
@@ -104,6 +105,25 @@ serve(async (req: Request) => {
           created_by: user.id,
         });
         if (!folderErr) resolvedFolderId = folderId;
+      }
+    } else if (folderName) {
+      // Legacy/non-UUID client folder id — resolve by name within the portal.
+      const { data: existing } = await supabase
+        .from("cloud_folders").select("id")
+        .eq("portal_id", portalId).eq("name", folderName).eq("is_deleted", false)
+        .maybeSingle();
+      if (existing) {
+        resolvedFolderId = existing.id as string;
+      } else {
+        const newId = crypto.randomUUID();
+        const { error: folderErr } = await supabase.from("cloud_folders").insert({
+          id: newId,
+          portal_id: portalId,
+          name: folderName,
+          parent_id: null,
+          created_by: user.id,
+        });
+        if (!folderErr) resolvedFolderId = newId;
       }
     }
 

@@ -108,8 +108,8 @@ export function useCloudFiles() {
   }, [currentPortalId, fetchAll]);
 
   const upload = useCallback(
-    async (file: File, folderId: string, folderName?: string): Promise<void> => {
-      if (!currentPortalId) return;
+    async (file: File, folderId: string, folderName?: string): Promise<string | null> => {
+      if (!currentPortalId) return null;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
       const mimeType = file.type || "application/octet-stream";
@@ -133,10 +133,11 @@ export function useCloudFiles() {
         body: file,
       });
       const text = await res.text();
-      let parsed: { error?: string } = {};
-      try { parsed = text ? JSON.parse(text) as { error?: string } : {}; } catch { /* non-JSON */ }
+      let parsed: { error?: string; folder_id?: string | null } = {};
+      try { parsed = text ? JSON.parse(text) as typeof parsed : {}; } catch { /* non-JSON */ }
       if (!res.ok) throw new Error(parsed.error ?? `Upload failed (HTTP ${res.status})`);
       await fetchAll();
+      return parsed.folder_id ?? null;
     },
     [currentPortalId, fetchAll]
   );
