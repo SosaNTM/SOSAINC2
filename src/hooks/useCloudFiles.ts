@@ -199,11 +199,16 @@ export function useCloudFiles() {
   const moveFile = useCallback(
     async (fileId: string, targetFolderId: string): Promise<void> => {
       if (!currentPortalId) return;
-      await supabase
+      // targetFolderId must be a real cloud_folders UUID (folder_id is a uuid FK).
+      // null = move to root. Non-UUID legacy ids would FK-fail, so coerce to null.
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const target = targetFolderId && UUID_RE.test(targetFolderId) ? targetFolderId : null;
+      const { error } = await supabase
         .from("cloud_files")
-        .update({ folder_id: targetFolderId })
+        .update({ folder_id: target })
         .eq("id", fileId)
         .eq("portal_id", currentPortalId);
+      if (error) throw new Error(error.message);
       await fetchAll();
     },
     [currentPortalId, fetchAll]
@@ -212,11 +217,12 @@ export function useCloudFiles() {
   const renameFile = useCallback(
     async (fileId: string, newName: string): Promise<void> => {
       if (!currentPortalId) return;
-      await supabase
+      const { error } = await supabase
         .from("cloud_files")
         .update({ name: newName })
         .eq("id", fileId)
         .eq("portal_id", currentPortalId);
+      if (error) throw new Error(error.message);
       await fetchAll();
     },
     [currentPortalId, fetchAll]

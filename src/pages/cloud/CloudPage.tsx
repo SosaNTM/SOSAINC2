@@ -1164,7 +1164,12 @@ const CloudPage = () => {
     const file = files.find((f) => f.id === fileId);
     const targetFolderName = folders.find((f) => f.id === targetFolderId)?.name || "folder";
     const sourceFolderName = file ? folders.find((f) => f.id === file.folderId)?.name || "Cloud" : "Cloud";
-    await cloudFiles.moveFile(fileId, targetFolderId);
+    try {
+      await cloudFiles.moveFile(fileId, targetFolderId);
+    } catch (err) {
+      toast.error(`Move failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+      return;
+    }
     toast.success(`Moved to ${targetFolderName}`);
     setMoveFileModal(null);
     setMoveTarget(null);
@@ -1180,8 +1185,14 @@ const CloudPage = () => {
     if (!val.trim()) { setRenamingFileId(null); return; }
     const file = files.find((f) => f.id === fileId);
     const oldName = file?.name;
-    await cloudFiles.renameFile(fileId, val.trim());
+    try {
+      await cloudFiles.renameFile(fileId, val.trim());
+    } catch (err) {
+      toast.error(`Rename failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+      return;
+    }
     setRenamingFileId(null);
+    toast.success("File renamed");
     if (file && oldName !== val.trim())
       addAuditEntry({
         userId, action: `Renamed "${oldName}" to "${val.trim()}"`, category: "cloud",
@@ -1192,23 +1203,18 @@ const CloudPage = () => {
   const handleDownload = useCallback(async (fileId: string) => {
     const url = await cloudFiles.getDownloadUrl(fileId);
     if (!url) { toast.error("Could not generate download link"); return; }
-    const file = files.find((f) => f.id === fileId);
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = file?.name ?? fileId;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
-    } catch {
-      toast.error("Download failed");
-    }
-  }, [cloudFiles, files]);
+    // Navigate directly to the presigned URL. We must NOT fetch()+blob it: that's a
+    // cross-origin request to iDrive S3, which the bucket's missing CORS policy blocks
+    // (same reason uploads are proxied). The presigned GET sets Content-Disposition:
+    // attachment, so the browser downloads it without a CORS-restricted fetch.
+    const a = document.createElement("a");
+    a.href = url;
+    a.rel = "noopener";
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, [cloudFiles]);
 
   const updateFileDescription = (_fileId: string, _desc: string) => {
     // Description editing is not persisted to the DB layer (acceptable known limitation).
