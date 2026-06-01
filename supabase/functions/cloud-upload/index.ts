@@ -19,7 +19,7 @@ function corsHeaders(req: Request) {
   const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-file-id, x-file-name, x-mime-type, x-portal-id, x-folder-id",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-file-name, x-mime-type, x-portal-id, x-folder-id, x-folder-name",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
@@ -54,6 +54,8 @@ serve(async (req: Request) => {
   try {
     const portalId = req.headers.get("x-portal-id") ?? "";
     const folderId = req.headers.get("x-folder-id") ?? "";
+    const rawFolderName = req.headers.get("x-folder-name") ?? "";
+    const folderName = rawFolderName ? decodeURIComponent(rawFolderName) : "";
     const rawName = req.headers.get("x-file-name") ?? "";
     const fileName = rawName ? decodeURIComponent(rawName) : "";
     const mimeType = req.headers.get("x-mime-type") || "application/octet-stream";
@@ -81,16 +83,27 @@ serve(async (req: Request) => {
       .eq("portal_id", portalId).eq("user_id", user.id).maybeSingle();
     if (!member) return json({ error: "Not a portal member" }, 403);
 
-    // Resolve folder: only attach folder_id if it's a real cloud_folders row in
-    // THIS portal. Client-only/unsynced folders or another portal's folder → null
+    // Resolve folder. If x-folder-id is a UUID, ensure the cloud_folders row exists
+    // (create it on the fly from x-folder-name) so files always link to their folder —
+    // removes the client-side debounced-sync race. Non-UUID/legacy ids → null
     // (file stored ungrouped). portal_id on the file is the real isolation boundary.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let resolvedFolderId: string | null = null;
-    if (folderId) {
+    if (folderId && UUID_RE.test(folderId)) {
       const { data: folder } = await supabase
         .from("cloud_folders").select("portal_id")
         .eq("id", folderId).maybeSingle();
-      if (folder && folder.portal_id === portalId) {
-        resolvedFolderId = folderId;
+      if (folder) {
+        if (folder.portal_id === portalId) resolvedFolderId = folderId;
+      } else {
+        const { error: folderErr } = await supabase.from("cloud_folders").insert({
+          id: folderId,
+          portal_id: portalId,
+          name: folderName || "Untitled",
+          parent_id: null,
+          created_by: user.id,
+        });
+        if (!folderErr) resolvedFolderId = folderId;
       }
     }
 

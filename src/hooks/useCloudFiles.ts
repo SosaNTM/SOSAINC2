@@ -108,7 +108,7 @@ export function useCloudFiles() {
   }, [currentPortalId, fetchAll]);
 
   const upload = useCallback(
-    async (file: File, folderId: string): Promise<void> => {
+    async (file: File, folderId: string, folderName?: string): Promise<void> => {
       if (!currentPortalId) return;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
@@ -126,6 +126,7 @@ export function useCloudFiles() {
           "Content-Type": "application/octet-stream",
           "x-portal-id": currentPortalId,
           "x-folder-id": folderId,
+          "x-folder-name": folderName ? encodeURIComponent(folderName) : "",
           "x-file-name": encodeURIComponent(file.name),
           "x-mime-type": mimeType,
         },
