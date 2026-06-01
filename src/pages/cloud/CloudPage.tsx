@@ -1219,7 +1219,7 @@ const CloudPage = () => {
     const folderName = folders.find((f) => f.id === folderId)?.name || folderId;
     for (const file of actualFiles) {
       try {
-        await cloudFiles.upload(file, folderId);
+        await cloudFiles.upload(file, folderId, folderName);
         successCount++;
       } catch (err) {
         toast.error(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : "Unknown error"}`);
