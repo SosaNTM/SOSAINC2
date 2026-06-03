@@ -123,7 +123,7 @@ export default function LeadgenSettings() {
   };
 
   const [token, setToken] = useState("");
-  const [actorId, setActorId] = useState("compass~google-maps-scraper");
+  const [actorId, setActorId] = useState("compass~crawler-google-places");
   const [showToken, setShowToken] = useState(false);
   const [countryCode, setCountryCode] = useState("IT");
   const [language, setLanguage] = useState("it");
@@ -146,7 +146,7 @@ export default function LeadgenSettings() {
   useEffect(() => {
     if (data && !hydrated) {
       setToken(data.apify_token ?? "");
-      setActorId(data.actor_id ?? "compass~google-maps-scraper");
+      setActorId(data.actor_id ?? "compass~crawler-google-places");
       setCountryCode(data.default_country_code);
       setLanguage(data.default_language);
       setMaxPlaces(data.default_max_places);
@@ -172,7 +172,7 @@ export default function LeadgenSettings() {
     setSaving(true);
     const { error } = await upsert({
       apify_token: token || null,
-      actor_id: actorId || "compass~google-maps-scraper",
+      actor_id: actorId || "compass~crawler-google-places",
       default_country_code: countryCode,
       default_language: language,
       default_max_places: maxPlaces,
@@ -289,7 +289,7 @@ export default function LeadgenSettings() {
           style={{ width: "100%" }}
         />
         <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", marginTop: 6, lineHeight: 1.7 }}>
-          Vai su <strong style={{ color: "var(--text-secondary)" }}>apify.com</strong> → cerca "Google Maps Scraper" → copia l'ID dall'URL (es. <code>compass~google-maps-scraper</code>). Assicurati di aver cliccato "Try for free" sull'actor.
+          Vai su <strong style={{ color: "var(--text-secondary)" }}>apify.com</strong> → cerca "Google Maps Scraper" → copia l'ID dall'URL (es. <code>compass~crawler-google-places</code>). Assicurati di aver cliccato "Try for free" sull'actor.
         </p>
       </div>
 

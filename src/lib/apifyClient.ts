@@ -1,5 +1,13 @@
 const BASE = "https://api.apify.com/v2";
-const DEFAULT_ACTOR_ID = "nwua9Gu5YrADL7ZDj";
+const DEFAULT_ACTOR_ID = "nwua9Gu5YrADL7ZDj"; // compass/crawler-google-places
+
+// The settings UI historically defaulted to a non-existent actor slug, which Apify
+// rejects with 404 "Actor with this name was not found". Normalize any stored value.
+const BAD_ACTOR_SLUGS = new Set(["compass~google-maps-scraper", "compass/google-maps-scraper"]);
+function normalizeActorId(actorId?: string): string {
+  if (!actorId || BAD_ACTOR_SLUGS.has(actorId)) return DEFAULT_ACTOR_ID;
+  return actorId;
+}
 
 function headers(token: string) {
   return {
@@ -49,7 +57,7 @@ export async function startGoogleMapsRun(
     maxCrawledPlacesPerSearch: input.maxCrawledPlacesPerSearch ?? 50,
     scrapeContacts: input.scrapeContacts ?? true,
   };
-  const actorId = input.actorId || DEFAULT_ACTOR_ID;
+  const actorId = normalizeActorId(input.actorId);
   const res = await apifyFetch<{ data: { id: string; defaultDatasetId: string } }>(
     token,
     `/acts/${actorId}/runs?memory=8192`,
@@ -59,7 +67,7 @@ export async function startGoogleMapsRun(
 }
 
 export async function getRunStatus(token: string, runId: string, actorId?: string): Promise<RunStatusResult> {
-  const actor = actorId || DEFAULT_ACTOR_ID;
+  const actor = normalizeActorId(actorId);
   const res = await apifyFetch<{
     data: { status: RunStatusResult["status"]; defaultDatasetId: string };
   }>(token, `/acts/${actor}/runs/${runId}`);
