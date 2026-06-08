@@ -3,11 +3,15 @@
  * The slugs ('sosa', 'keylo', etc.) are what the app uses internally.
  * The UUIDs are what Supabase foreign keys reference.
  */
+// These MUST match the actual public.portals.id values in Supabase.
+// (Earlier they were 00000000-… which do not exist → every FK insert silently
+//  failed, so vault items / files never persisted.)
 export const PORTAL_UUID_MAP: Record<string, string> = {
-  sosa: "00000000-0000-0000-0000-000000000001",
-  keylo: "00000000-0000-0000-0000-000000000002",
-  redx: "00000000-0000-0000-0000-000000000003",
-  trustme: "00000000-0000-0000-0000-000000000004",
+  sosa:     "a1000000-0000-0000-0000-000000000001",
+  keylo:    "a1000000-0000-0000-0000-000000000002",
+  redx:     "a1000000-0000-0000-0000-000000000003",
+  trustme:  "a1000000-0000-0000-0000-000000000004",
+  "trust-me": "a1000000-0000-0000-0000-000000000004",
 };
 
 /**
